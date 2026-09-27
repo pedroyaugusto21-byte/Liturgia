@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Calendário Litúrgico Circular</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Jost:wght@300;400;500&family=Noto+Sans+Symbols&family=Noto+Sans+Symbols+2&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    min-height: 100vh;
+    background: radial-gradient(ellipse at center, #16213d 0%, #0b1120 65%);
+    color: #efe6d2;
+    font-family: 'Jost', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .wrap {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 40px 20px 64px;
+    display: grid;
+    gap: 40px;
+    align-items: center;
+  }
+  @media (min-width: 900px) { .wrap { grid-template-columns: 1fr 340px; gap: 56px; padding: 56px 20px; } }
+  .clock-wrap { width: 100%; max-width: 680px; margin: 0 auto; }
+  .clock { width: 100%; height: auto; display: block; user-select: none; }
+  .eyebrow { font-size: 10px; text-transform: uppercase; letter-spacing: 0.4em; color: #c9a45c; }
+  h1 { font-family: 'Cormorant Garamond', serif; font-size: 40px; line-height: 1.05; margin-top: 12px; }
+  @media (min-width: 900px) { h1 { font-size: 48px; } }
+  .lede { margin: 16px 0 28px; font-size: 14px; line-height: 1.6; color: rgba(239,230,210,0.55); }
+  .info { border-top: 1px solid rgba(201,164,92,0.25); border-bottom: 1px solid rgba(201,164,92,0.25); }
+  .row { display: flex; align-items: center; gap: 16px; padding: 15px 0; border-top: 1px solid rgba(201,164,92,0.12); }
+  .row:first-child { border-top: none; }
+  .dot { height: 8px; width: 8px; border-radius: 50%; flex-shrink: 0; }
+  .label { width: 64px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.25em; color: rgba(201,164,92,0.8); }
+  .val { flex: 1; min-width: 0; }
+  .v { font-family: 'Cormorant Garamond', serif; font-size: 20px; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .d { font-size: 12px; color: rgba(239,230,210,0.5); margin-top: 2px; font-family: 'Noto Sans Symbols','Noto Sans Symbols 2','Jost',sans-serif; }
+  .controls { margin-top: 30px; display: flex; flex-direction: column; gap: 14px; }
+  .ctl-head { display: flex; justify-content: space-between; align-items: center; }
+  .mode { font-size: 10px; text-transform: uppercase; letter-spacing: 0.2em; color: rgba(239,230,210,0.5); }
+  .ctl-row { display: flex; align-items: center; gap: 8px; }
+  button { cursor: pointer; font-family: inherit; border: none; background: none; color: inherit; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 6px; font-size: 12px; border: 1px solid rgba(201,164,92,0.25); color: rgba(239,230,210,0.6); transition: background .15s; white-space: nowrap; }
+  .btn:hover { background: rgba(201,164,92,0.1); }
+  .btn-on { border-color: #f3d08a; background: rgba(201,164,92,0.15); color: #f3d08a; }
+  .btn-now { border-color: rgba(201,164,92,0.4); color: #f3d08a; }
+  .btn-play { background: #c9a45c; color: #0b1120; border: none; font-weight: 500; padding: 8px 16px; }
+  .btn-play:hover { background: #f3d08a; }
+  input[type="datetime-local"] { flex: 1; min-width: 0; background: #0b1120; border: 1px solid rgba(201,164,92,0.25); border-radius: 6px; padding: 8px; font-size: 12px; color: #efe6d2; color-scheme: dark; font-family: inherit; }
+  .speeds { display: flex; gap: 6px; }
+  .speed { flex: 1; padding: 6px 4px; border-radius: 6px; border: 1px solid rgba(201,164,92,0.2); font-size: 10px; color: rgba(239,230,210,0.55); transition: background .15s; }
+  .speed:hover { background: rgba(201,164,92,0.1); }
+  .speed-on { border-color: #f3d08a; background: rgba(201,164,92,0.15); color: #f3d08a; }
+
+  /* ---- Intro animation ---- */
+  .intro {
+    position: fixed; inset: 0; z-index: 9999;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: radial-gradient(ellipse at center, #16213d 0%, #0b1120 70%);
+    transition: opacity 1s ease;
+  }
+  .intro.fade-out { opacity: 0; pointer-events: none; }
+  .intro-stage { width: min(80vw, 320px); height: auto; display: block; overflow: visible; }
+  .intro-title { margin-top: 22px; font-family: 'Cormorant Garamond', serif; letter-spacing: 0.35em; text-transform: uppercase; font-size: 12px; color: #c9a45c; opacity: 0; transition: opacity 1.2s ease; }
+  .intro-title.show { opacity: 1; }
+  #introOrbitGroup, #introMoonGroup { transform-origin: 150px 150px; transition: opacity 1s ease; }
+  #introOrbitGroup { animation: introSpinSun 4s linear infinite; }
+  #introMoonGroup { animation: introSpinMoon 1.6s linear infinite; }
+  @keyframes introSpinSun { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  @keyframes introSpinMoon { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  #introOrbitGroup.fade, #introMoonGroup.fade, .intro-orbit-path { transition: opacity 1s ease; }
+  .intro-orbit-path.fade, #introOrbitGroup.fade, #introMoonGroup.fade { opacity: 0; }
+  #introEarth { transition: opacity 1s ease, transform 1s ease; transform-origin: 150px 150px; }
+  #introEarth.fade { opacity: 0; transform: scale(0.25); }
+  #introPointer { opacity: 0; transition: opacity 1.2s ease; }
+  #introPointer.show { opacity: 1; }
+  .intro-ring { opacity: 0; transform-origin: 150px 150px; transform: scale(0.15); transition: opacity 0.9s ease, transform 0.9s cubic-bezier(.2,.8,.3,1); }
+  .intro-ring.show { opacity: 1; transform: scale(1); }
+</style>
+</head>
+<body>
+  <div class="intro" id="intro" aria-hidden="true">
+    <svg class="intro-stage" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <radialGradient id="earthGrad" cx="35%" cy="35%" r="70%">
+          <stop offset="0%" stop-color="#7fd8c9"/>
+          <stop offset="55%" stop-color="#2f7a6b"/>
+          <stop offset="100%" stop-color="#12312c"/>
+        </radialGradient>
+      </defs>
+      <circle class="intro-ring" cx="150" cy="150" r="45" fill="none" stroke="#efe6d2" stroke-width="1.2"/>
+      <circle class="intro-ring" cx="150" cy="150" r="70" fill="none" stroke="#b9c6db" stroke-width="1.2"/>
+      <circle class="intro-ring" cx="150" cy="150" r="95" fill="none" stroke="#e0906a" stroke-width="1.2"/>
+      <circle class="intro-ring" cx="150" cy="150" r="118" fill="none" stroke="#a9c4a4" stroke-width="1.2"/>
+      <circle class="intro-ring" cx="150" cy="150" r="138" fill="none" stroke="rgba(201,164,92,0.6)" stroke-width="1"/>
+      <circle class="intro-orbit-path" cx="150" cy="150" r="100" fill="none" stroke="rgba(201,164,92,0.25)" stroke-dasharray="4 6"/>
+      <circle class="intro-orbit-path" cx="150" cy="150" r="55" fill="none" stroke="rgba(185,198,219,0.25)" stroke-dasharray="3 5"/>
+      <circle id="introEarth" cx="150" cy="150" r="18" fill="url(#earthGrad)"/>
+      <g id="introOrbitGroup">
+        <circle cx="250" cy="150" r="10" fill="#f3d08a" style="filter:drop-shadow(0 0 6px #f3d08a)"/>
+      </g>
+      <g id="introMoonGroup">
+        <circle cx="205" cy="150" r="6" fill="#b9c6db"/>
+      </g>
+      <g id="introPointer">
+        <line x1="150" y1="150" x2="150" y2="90" stroke="#f3d08a" stroke-width="3" stroke-linecap="round"/>
+        <circle cx="150" cy="90" r="6" fill="#f3d08a" style="filter:drop-shadow(0 0 6px #f3d08a)"/>
+        <circle cx="150" cy="150" r="5" fill="#0b1120" stroke="#f3d08a" stroke-width="2"/>
+      </g>
+    </svg>
+    <p class="intro-title">Rota Temporum</p>
+  </div>
+  <div class="wrap">
+    <div class="clock-wrap" id="clockdiv"></div>
+    <aside>
+      <p class="eyebrow">Rota Temporum</p>
+      <h1>Calendário Litúrgico Circular</h1>
+      <p class="lede">Seis círculos do tempo — o dia, a semana, a lua, os meses, as estações e os signos — girando juntos agora.</p>
+      <div class="info" id="info"></div>
+      <div class="controls">
+        <div class="ctl-head">
+          <span class="eyebrow">Controle do tempo</span>
+          <span class="mode" id="modeLabel">Ao vivo</span>
+        </div>
+        <div class="ctl-row">
+          <button class="btn btn-now" id="btnNow">🕐 Agora</button>
+          <input type="datetime-local" id="dt">
+        </div>
+        <div class="ctl-row">
+          <button class="btn" id="btnPast">⏪ Passado</button>
+          <button class="btn-play" id="btnPlay">▶ Reproduzir</button>
+          <button class="btn" id="btnFut">Futuro ⏩</button>
+        </div>
+        <div class="speeds" id="speeds"></div>
+      </div>
+    </aside>
+  </div>
+
+<script>
+const C = 500;
+const WEEK = [
+  { sym: '☉', astro: 'Sol', name: 'Domingo' },
+  { sym: '☽', astro: 'Lua', name: 'Segunda-feira' },
+  { sym: '♂', astro: 'Marte', name: 'Terça-feira' },
+  { sym: '☿', astro: 'Mercúrio', name: 'Quarta-feira' },
+  { sym: '♃', astro: 'Júpiter', name: 'Quinta-feira' },
+  { sym: '♀', astro: 'Vênus', name: 'Sexta-feira' },
+  { sym: '♄', astro: 'Saturno', name: 'Sábado' },
+];
+const ZODIAC = [['♈','Áries'],['♉','Touro'],['♊','Gêmeos'],['♋','Câncer'],['♌','Leão'],['♍','Virgem'],['♎','Libra'],['♏','Escorpião'],['♐','Sagitário'],['♑','Capricórnio'],['♒','Aquário'],['♓','Peixes']]
+  .map(([s, n]) => ({ sym: s + '\uFE0E', name: n }));
+const ROMAN = ['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'];
+const PHASES = ['Lua Nova','Crescente','Quarto Crescente','Crescente Gibosa','Lua Cheia','Minguante Gibosa','Quarto Minguante','Minguante'];
+const SEASONS = ['Outono','Inverno','Primavera','Verão'];
+const ORDINALS = ['Primeiro','Segundo','Terceiro'];
+const ZODIAC_OFFSET = 45;
+const SYMBOL_FONT = "'Noto Sans Symbols','Noto Sans Symbols 2',serif";
+
+const ICONS = { 1:'wheat', 2:'bouquet', 4:'moonCircle', 5:'snowflake', 7:'flower', 8:'flowerBouquet', 10:'sun', 11:'sickle' };
+const FESTIVALS = {
+  1: { name: 'Mistérios Menores', date: 'Equinócio de Março', theme: 'Adônis morre, Afrodite se lamenta, Zeus fulmina Semele e Hades sequestra Koré' },
+  2: { name: 'Terceira Colheita', date: '1º de Maio', theme: 'Hades se casa com Koré, Deméter chora de luto e se lamenta' },
+  4: { name: 'Banquete dos Mortos', date: 'Solstício de Junho', theme: 'Deméter sofre e faz a Terra sofrer, Zeus costura Baco na coxa, Perséfone se une à Adônis' },
+  5: { name: 'Candelária', date: '1º de Agosto', theme: 'Deméter e Hécate saem em busca de Perséfone, Kuretes e Koribantes protegem Baco' },
+  7: { name: 'Mistérios Maiores', date: 'Equinócio de Setembro', theme: 'Perséfone retorna à Deméter trazida por Hermes e Hécate, Adônis retorna para Afrodite' },
+  8: { name: 'Florália', date: '1º de Novembro', theme: 'Afrodite e Adônis celebram, Zeus se une a Perséfone para gerar Zagreus' },
+  10: { name: 'Banquete dos Vivos', date: 'Solstício de Dezembro', theme: 'Hélios Rei, Baco nasce e é coroado Rei dos Deuses, Dionísos retorna triunfante' },
+  11: { name: 'Primeira Colheita', date: '1º de Fevereiro', theme: 'Os Titãs despedaçam Iacco, o Zagreus, Dioníso dos Mistérios, O Coração é salvo por Athena e entregue à Zeus, que o dá à Sêmele' },
+};
+
+let sunRays = '';
+for (let i = 0; i < 16; i++) {
+  const t = i * Math.PI / 8, r2 = i % 2 ? 8.5 : 11;
+  sunRays += `M${12 + 6 * Math.sin(t)} ${12 - 6 * Math.cos(t)} L${12 + r2 * Math.sin(t)} ${12 - r2 * Math.cos(t)} `;
+}
+const ICON_PATHS = {
+  wheat: '<path d="M12 22V8M12 8c-3 0-5-2-5-5M12 8c3 0 5-2 5-5M12 12c-3 0-5-2-5-5M12 12c3 0 5-2 5-5M12 16c-3 0-5-2-5-5M12 16c3 0 5-2 5-5"/>',
+  bouquet: '<circle cx="7.5" cy="7" r="2.5"/><circle cx="16.5" cy="7" r="2.5"/><circle cx="12" cy="4.5" r="2.5"/><path d="M8 9.5L12 21M16 9.5L12 21M12 7v14M9.5 15.5h5"/>',
+  moonCircle: '<circle cx="12" cy="12" r="10"/><path d="M15 7.2A5.2 5.2 0 1 0 15 16.8A5 5 0 0 1 15 7.2Z"/>',
+  snowflake: '<path d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M19.07 4.93L4.93 19.07"/><path d="M12 6l-2-2M12 6l2-2M12 18l-2 2M12 18l2 2M6 12l-2-2M6 12l-2 2M18 12l2-2M18 12l2 2"/>',
+  flower: '<circle cx="12" cy="12" r="2"/><circle cx="12" cy="7" r="2.3"/><circle cx="7.25" cy="10.45" r="2.3"/><circle cx="9.06" cy="16.05" r="2.3"/><circle cx="14.94" cy="16.05" r="2.3"/><circle cx="16.75" cy="10.45" r="2.3"/>',
+  flowerBouquet: '<circle cx="7.5" cy="5.2" r="1"/><circle cx="7.5" cy="8.8" r="1"/><circle cx="5.7" cy="7" r="1"/><circle cx="9.3" cy="7" r="1"/><circle cx="7.5" cy="7" r="1.1"/><circle cx="16.5" cy="5.2" r="1"/><circle cx="16.5" cy="8.8" r="1"/><circle cx="14.7" cy="7" r="1"/><circle cx="18.3" cy="7" r="1"/><circle cx="16.5" cy="7" r="1.1"/><circle cx="12" cy="2.7" r="1"/><circle cx="12" cy="6.3" r="1"/><circle cx="10.2" cy="4.5" r="1"/><circle cx="13.8" cy="4.5" r="1"/><circle cx="12" cy="4.5" r="1.1"/><path d="M8 9.5L12 21M16 9.5L12 21M12 7v14M9.5 15.5h5"/>',
+  sun: '<circle cx="12" cy="12" r="4.5"/><path d="' + sunRays + '"/>',
+  sickle: '<path d="M4 21L9 16M9 16C4 10 8 3 15 3C20 3 22 7 21 10C19 6 15 5 12 7C9 9 9 13 10.5 15"/>',
+};
+
+const norm = (a) => ((a % 360) + 360) % 360;
+const polar = (r, a) => { const t = a * Math.PI / 180; return [C + r * Math.sin(t), C - r * Math.cos(t)]; };
+function sector(r1, r2, a1, a2) {
+  const large = (a2 - a1) > 180 ? 1 : 0;
+  const [x1, y1] = polar(r2, a1), [x2, y2] = polar(r2, a2), [x3, y3] = polar(r1, a2), [x4, y4] = polar(r1, a1);
+  return `M${x1} ${y1} A${r2} ${r2} 0 ${large} 1 ${x2} ${y2} L${x3} ${y3} A${r1} ${r1} 0 ${large} 0 ${x4} ${y4} Z`;
+}
+function newMoonJD(k) {
+  const T = k / 1236.85, T2 = T * T, T3 = T2 * T, T4 = T3 * T;
+  const JDE = 2451550.09765 + 29.530588853 * k + 0.0001337 * T2 - 0.000000150 * T3 + 0.00000000073 * T4;
+  const r = Math.PI / 180;
+  const M = (2.5534 + 29.10535669 * k - 0.0000014 * T2 - 0.00000011 * T3) * r;
+  const Mp = (201.5643 + 385.81693528 * k + 0.0107438 * T2 + 0.00001239 * T3 - 0.000000058 * T4) * r;
+  const F = (160.7108 + 390.67050274 * k - 0.0016341 * T2 - 0.00000227 * T3 + 0.000000011 * T4) * r;
+  return JDE
+    - 0.40720 * Math.sin(Mp) + 0.17241 * Math.sin(M) + 0.01607 * Math.sin(2 * Mp)
+    + 0.01039 * Math.sin(2 * F) + 0.00739 * Math.sin(Mp - M) - 0.00514 * Math.sin(Mp + M)
+    + 0.00208 * Math.sin(2 * M) - 0.00111 * Math.sin(Mp - 2 * F) - 0.00057 * Math.sin(Mp + 2 * F)
+    + 0.00056 * Math.sin(2 * Mp + M) - 0.00042 * Math.sin(3 * Mp);
+}
+const monthName = (i) => `${ORDINALS[i % 3]} da ${SEASONS[Math.floor(i / 3)]}`;
+
+function getState(now) {
+  const hours = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
+  const period = hours >= 6 && hours < 12 ? 'Amanhecer' : hours >= 12 && hours < 18 ? 'Entardecer' : 'Noite';
+  const weekIndex = now.getDay();
+  const SYN = 29.530588853;
+  const jdNow = now.getTime() / 86400000 + 2440587.5;
+  let k = Math.floor((jdNow - 2451550.09765) / SYN);
+  let nm0 = newMoonJD(k);
+  if (nm0 > jdNow) { k--; nm0 = newMoonJD(k); }
+  const nm1 = newMoonJD(k + 1);
+  const moonDays = Math.round(nm1 - nm0);
+  const age = jdNow - nm0;
+  const moonIndex = Math.min(Math.floor(age), moonDays - 1);
+  const frac = age / moonDays;
+  const phaseName = PHASES[Math.floor(frac * 8 + 0.5) % 8];
+  const month = (((k + 1) % 12) + 12) % 12;
+  const n = (now - Date.UTC(2000, 0, 1, 12)) / 864e5;
+  const L = 280.46 + 0.9856474 * n;
+  const g = ((357.528 + 0.9856003 * n) * Math.PI) / 180;
+  const lambda = norm(L + 1.915 * Math.sin(g) + 0.02 * Math.sin(2 * g));
+  const signIndex = Math.floor(lambda / 30);
+  return {
+    hours, period, weekIndex, moonIndex, moonDays, phaseName, age, month, signIndex,
+    dayAngle: 180 + hours * 15,
+    weekAngle: ((weekIndex + hours / 24) / 7) * 360,
+    moonAngle: frac * 360,
+    monthAngle: ((month + frac) / 12) * 360,
+    zodiacAngle: ZODIAC_OFFSET + lambda,
+  };
+}
+
+function ring(r1, r2, count, offset, active, labelFn) {
+  const step = 360 / count;
+  let g = '';
+  for (let i = 0; i < count; i++) {
+    const a1 = offset + i * step;
+    const [lx, ly] = polar((r1 + r2) / 2, a1 + step / 2);
+    const on = i === active;
+    const fill = on ? 'rgba(227,194,122,0.18)' : (i % 2 ? 'rgba(255,255,255,0.012)' : 'rgba(255,255,255,0.035)');
+    g += `<path d="${sector(r1, r2, a1, a1 + step)}" fill="${fill}" stroke="rgba(201,164,92,0.28)" stroke-width="1"/>`;
+    g += labelFn(i, lx, ly, on);
+  }
+  g += `<circle cx="500" cy="500" r="${r2}" fill="none" stroke="rgba(201,164,92,0.75)" stroke-width="1.2"/>`;
+  return g;
+}
+function hand(angle, r1, r2, color, width) {
+  width = width || 4;
+  return `<g transform="rotate(${angle} 500 500)" style="filter:drop-shadow(0 0 6px ${color}66)"><polygon points="${500 - width},${500 - r1} 500,${500 - r2} ${500 + width},${500 - r1}" fill="${color}"/><circle cx="500" cy="${500 - r1}" r="${width + 1.5}" fill="#0b1120" stroke="${color}" stroke-width="1.5"/></g>`;
+}
+function moonGlyph(x, y, r, phase) {
+  let g = `<circle cx="${x}" cy="${y}" r="${r}" fill="${phase === 'full' ? '#efe6d2' : '#0b1120'}" stroke="#efe6d2" stroke-width="1.2"/>`;
+  if (phase === 'first') g += `<path d="M${x} ${y - r} A${r} ${r} 0 0 1 ${x} ${y + r} Z" fill="#efe6d2"/>`;
+  if (phase === 'last') g += `<path d="M${x} ${y - r} A${r} ${r} 0 0 0 ${x} ${y + r} Z" fill="#efe6d2"/>`;
+  return g;
+}
+function iconSVG(type, x, y, size, color, title) {
+  return `<g style="cursor:pointer"><title>${title}</title><circle cx="${x}" cy="${y}" r="${size / 2 + 6}" fill="rgba(0,0,0,0.001)"/><svg x="${x - size / 2}" y="${y - size / 2}" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none">${ICON_PATHS[type]}</svg></g>`;
+}
+
+function dayCore(r, period) {
+  let g = `<defs><linearGradient id="dawn" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#3b3552"/><stop offset="1" stop-color="#c99a6b"/></linearGradient><linearGradient id="dusk" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#b8776a"/><stop offset="1" stop-color="#3f2c46"/></linearGradient></defs>`;
+  g += `<path d="${sector(0, r, 90, 270)}" fill="#0f1830"/>`;
+  g += `<path d="${sector(0, r, 270, 360)}" fill="url(#dawn)" opacity="0.85"/>`;
+  g += `<path d="${sector(0, r, 0, 90)}" fill="url(#dusk)" opacity="0.85"/>`;
+  for (let h = 0; h < 24; h++) {
+    const a = 180 + h * 15;
+    const [x1, y1] = polar(r - (h % 6 === 0 ? 12 : 6), a), [x2, y2] = polar(r, a);
+    g += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#e8dcc0" stroke-opacity="0.5" stroke-width="1"/>`;
+  }
+  [['Noite', 180, 62], ['Amanhecer', 315, 58], ['Entardecer', 45, 58]].forEach(([lab, a, rr]) => {
+    const [x, y] = polar(rr, a);
+    g += `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="central" font-size="9" letter-spacing="1" fill="#efe6d2" opacity="${period === lab ? 1 : 0.55}" style="font-family:'Jost',sans-serif;text-transform:uppercase">${lab}</text>`;
+  });
+  g += `<circle cx="500" cy="500" r="${r}" fill="none" stroke="rgba(201,164,92,0.85)" stroke-width="1.5"/>`;
+  return g;
+}
+function weekRing(r1, r2, active) {
+  return ring(r1, r2, 7, 0, active, (i, x, y, on) =>
+    `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="central" font-size="28" fill="${on ? '#f3d08a' : '#e8dcc0'}" opacity="${on ? 1 : 0.75}" style="font-family:${SYMBOL_FONT}">${WEEK[i].sym}</text>`);
+}
+function moonRing(r1, r2, count, active) {
+  const phases = { 1: 'new', [Math.round(count / 4)]: 'first', [Math.round(count / 2)]: 'full', [Math.round(3 * count / 4)]: 'last' };
+  return ring(r1, r2, count, 0, active, (i, x, y, on) => {
+    const day = i + 1;
+    return phases[day]
+      ? moonGlyph(x, y, 9, phases[day])
+      : `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="central" font-size="10" fill="${on ? '#f3d08a' : '#e8dcc0'}" opacity="${on ? 1 : 0.45}" style="font-family:'Jost',sans-serif">${day}</text>`;
+  });
+}
+function monthRing(r1, r2, active) {
+  return ring(r1, r2, 12, 0, active, (i, x, y, on) =>
+    `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="central" font-size="24" fill="${on ? '#f3d08a' : '#efe6d2'}" opacity="${on ? 1 : 0.8}" style="font-family:'Cormorant Garamond',serif;font-weight:600">${ROMAN[i]}</text>`);
+}
+function seasonRing(r1, r2, active) {
+  return ring(r1, r2, 12, 0, active, (i, x, y, on) => {
+    const f = FESTIVALS[i];
+    return f
+      ? iconSVG(ICONS[i], x, y, 32, on ? '#f3d08a' : '#e8dcc0', `${f.name} — ${f.date}\n${f.theme}`)
+      : `<circle cx="${x}" cy="${y}" r="2" fill="#c9a45c" opacity="0.5"/>`;
+  });
+}
+function zodiacRing(r1, r2, active) {
+  return ring(r1, r2, 12, ZODIAC_OFFSET, active, (i, x, y, on) =>
+    `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="central" font-size="30" fill="${on ? '#f3d08a' : '#e8dcc0'}" opacity="${on ? 1 : 0.75}" style="font-family:${SYMBOL_FONT}">${ZODIAC[i].sym}</text>`);
+}
+function hourHand(angle, color) {
+  return `<g transform="rotate(${angle} 500 500)" style="filter:drop-shadow(0 0 8px ${color}88)"><polygon points="495,518 500,404 505,518" fill="${color}"/><circle cx="500" cy="500" r="9" fill="#0b1120" stroke="${color}" stroke-width="2"/><circle cx="500" cy="500" r="3" fill="${color}"/></g>`;
+}
+function sunTip(cx, cy, r) {
+  let rays = '';
+  for (let i = 0; i < 8; i++) {
+    const a = i * Math.PI / 4;
+    const x1 = cx + (r + 2) * Math.sin(a), y1 = cy - (r + 2) * Math.cos(a);
+    const x2 = cx + (r + 5) * Math.sin(a), y2 = cy - (r + 5) * Math.cos(a);
+    rays += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#f3d08a" stroke-width="1.4" stroke-linecap="round"/>`;
+  }
+  return `<g style="filter:drop-shadow(0 0 4px #f3d08a99)">${rays}<circle cx="${cx}" cy="${cy}" r="${r}" fill="#f3d08a" stroke="#0b1120" stroke-width="1"/></g>`;
+}
+
+function buildSVG(s) {
+  let g = `<circle cx="500" cy="500" r="438" fill="none" stroke="rgba(201,164,92,0.35)" stroke-width="1"/><circle cx="500" cy="500" r="446" fill="none" stroke="rgba(201,164,92,0.15)" stroke-width="1"/>`;
+  g += zodiacRing(345, 420, s.signIndex);
+  g += seasonRing(282, 345, s.month);
+  g += monthRing(230, 282, s.month);
+  g += moonRing(170, 230, s.moonDays, s.moonIndex);
+  g += weekRing(110, 170, s.weekIndex);
+  g += dayCore(110, s.period);
+  g += hand(s.weekAngle, 110, 158, '#efe6d2');
+  g += hand(s.moonAngle, 170, 214, '#b9c6db');
+  g += hand(s.monthAngle, 230, 268, '#e0906a');
+  g += hand(s.zodiacAngle, 345, 400, '#a9c4a4');
+  g += hourHand(s.dayAngle, '#f3d08a');
+  const [zx, zy] = polar(400, s.zodiacAngle);
+  g += sunTip(zx, zy, 7);
+  const [hx, hy] = polar(96, s.dayAngle);
+  g += sunTip(hx, hy, 6);
+  return `<svg viewBox="40 40 920 920" class="clock" xmlns="http://www.w3.org/2000/svg">${g}</svg>`;
+}
+
+function buildInfo(s, now) {
+  const rows = [
+    ['#f3d08a', 'Hora', now.toLocaleTimeString('pt-BR'), s.period],
+    ['#efe6d2', 'Dia', WEEK[s.weekIndex].name, WEEK[s.weekIndex].sym + ' ' + WEEK[s.weekIndex].astro],
+    ['#b9c6db', 'Lua', s.phaseName, `Dia ${Math.floor(s.age) + 1} de ${s.moonDays}`],
+    ['#e0906a', 'Mês', monthName(s.month), `Mês ${ROMAN[s.month]}`],
+    ['#a9c4a4', 'Sol em', ZODIAC[s.signIndex].name, ZODIAC[s.signIndex].sym],
+  ];
+  return rows.map(([c, l, v, d]) =>
+    `<div class="row"><span class="dot" style="background:${c};box-shadow:0 0 10px ${c}"></span><span class="label">${l}</span><div class="val"><p class="v">${v}</p><p class="d">${d}</p></div></div>`).join('');
+}
+
+let mode = 'live', simTime = Date.now(), speed = 3600, direction = 1, intervalId = null;
+const SPEEDS = [{ label: '1 min/s', v: 60 }, { label: '1 h/s', v: 3600 }, { label: '1 dia/s', v: 86400 }, { label: '1 sem/s', v: 604800 }];
+const pad = (n) => String(n).padStart(2, '0');
+const toLocalInput = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+
+function render() {
+  const now = new Date(simTime);
+  const s = getState(now);
+  document.getElementById('clockdiv').innerHTML = buildSVG(s);
+  document.getElementById('info').innerHTML = buildInfo(s, now);
+  document.getElementById('dt').value = toLocalInput(now);
+  document.getElementById('modeLabel').textContent = mode === 'live' ? 'Ao vivo' : mode === 'playing' ? 'Reproduzindo' : 'Pausado';
+  document.getElementById('btnPlay').innerHTML = mode === 'playing' ? '⏸ Pausar' : '▶ Reproduzir';
+  document.getElementById('btnPast').className = 'btn' + (direction === -1 ? ' btn-on' : '');
+  document.getElementById('btnFut').className = 'btn' + (direction === 1 ? ' btn-on' : '');
+}
+function start() {
+  clearInterval(intervalId);
+  if (mode === 'live') {
+    simTime = Date.now();
+    intervalId = setInterval(() => { simTime = Date.now(); render(); }, 1000);
+  } else if (mode === 'playing') {
+    intervalId = setInterval(() => { simTime += direction * speed * 100; render(); }, 100);
+  }
+  render();
+}
+document.getElementById('btnNow').onclick = () => { mode = 'live'; start(); };
+document.getElementById('btnPlay').onclick = () => { mode = mode === 'playing' ? 'paused' : 'playing'; start(); };
+document.getElementById('btnPast').onclick = () => { direction = -1; if (mode !== 'playing') { mode = 'playing'; } start(); };
+document.getElementById('btnFut').onclick = () => { direction = 1; if (mode !== 'playing') { mode = 'playing'; } start(); };
+document.getElementById('dt').onchange = (e) => { if (e.target.value) { simTime = new Date(e.target.value).getTime(); mode = 'paused'; start(); } };
+document.getElementById('speeds').innerHTML = SPEEDS.map((sp) =>
+  `<button class="speed${sp.v === speed ? ' speed-on' : ''}" data-v="${sp.v}">${sp.label}</button>`).join('');
+document.getElementById('speeds').querySelectorAll('button').forEach((b) => {
+  b.onclick = () => { speed = Number(b.dataset.v); start(); };
+});
+start();
+
+(function () {
+  const introEl = document.getElementById('intro');
+  if (!introEl) return;
+  const earth = document.getElementById('introEarth');
+  const sunOrbit = document.getElementById('introOrbitGroup');
+  const moonOrbit = document.getElementById('introMoonGroup');
+  const orbitPaths = document.querySelectorAll('.intro-orbit-path');
+  const pointer = document.getElementById('introPointer');
+  const rings = document.querySelectorAll('.intro-ring');
+  const title = document.querySelector('.intro-title');
+
+  setTimeout(() => {
+    earth.classList.add('fade');
+    sunOrbit.classList.add('fade');
+    moonOrbit.classList.add('fade');
+    orbitPaths.forEach((p) => p.classList.add('fade'));
+    pointer.classList.add('show');
+  }, 6000);
+
+  rings.forEach((r, i) => {
+    setTimeout(() => r.classList.add('show'), 7500 + i * 900);
+  });
+
+  setTimeout(() => { title.classList.add('show'); }, 7800);
+
+  setTimeout(() => {
+    introEl.classList.add('fade-out');
+    setTimeout(() => { introEl.style.display = 'none'; }, 1000);
+  }, 14500);
+})();
+</script>
+</body>
+</html>
