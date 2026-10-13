@@ -1,0 +1,88 @@
+/* ======================================================================
+   MAPA ASTRAL — tempo acelerado, dignidades, aspectos e estrelas fixas
+   Folha de estilo do módulo astral.js (Calendarium — aba Urano)
+   ====================================================================== */
+
+/* ---------- caixa de controle do tempo do mapa astral ---------- */
+#ouranosView .ou-time-box {
+  width: 100%; display: flex; flex-direction: column; gap: .55rem;
+  padding: .75rem .85rem .85rem; margin-bottom: 1rem;
+  border: 1px solid var(--ou-border); border-radius: 12px; background: var(--ou-card);
+}
+#ouranosView .ou-time-box .ou-row { gap: .35rem; }
+#ouranosView #ou-astral-dt {
+  padding: .3rem .45rem; border-radius: 7px; border: 1px solid var(--ou-border);
+  background: #0c1421; color: var(--ou-text); font-family: ui-monospace, monospace; font-size: .68rem;
+}
+#ouranosView #ou-astral-dt::-webkit-calendar-picker-indicator { filter: invert(.75) sepia(.5) saturate(4) hue-rotate(175deg); cursor: pointer; }
+#ouranosView .ou-time-clock { text-align: center; font-size: .7rem; line-height: 1.5; color: var(--ou-text); }
+#ouranosView .ou-time-clock b { font-family: ui-monospace, monospace; font-weight: 600; letter-spacing: .4px; color: var(--ou-gold); }
+#ouranosView .ou-time-clock em { font-style: normal; color: var(--ou-muted); }
+#ouranosView .ou-time-box.sim .ou-time-clock b { color: var(--ou-primary); }
+
+/* ---------- títulos da leitura astrológica ---------- */
+#ouranosView .ou-detail-h {
+  width: 100%; margin: 1.5rem 0 .8rem; padding-top: 1.1rem;
+  border-top: 1px solid var(--ou-border); text-align: center;
+}
+#ouranosView .ou-detail-h h2 {
+  font-family: 'Space Grotesk', sans-serif; font-size: .78rem; font-weight: 600;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--ou-gold); margin-bottom: .4rem;
+}
+#ouranosView .ou-detail-h p { font-size: .68rem; line-height: 1.6; color: var(--ou-muted); max-width: 580px; margin: 0 auto; }
+
+/* ---------- cartões por astro ---------- */
+#ouranosView .ou-astro-list { width: 100%; display: flex; flex-direction: column; gap: .7rem; }
+#ouranosView .ou-astro {
+  border: 1px solid var(--ou-border); border-left-width: 3px; border-radius: 12px;
+  background: rgba(255,255,255,.02); padding: .7rem .85rem .8rem;
+}
+#ouranosView .ou-astro-h { display: flex; align-items: baseline; gap: .5rem; flex-wrap: wrap; margin-bottom: .55rem; }
+#ouranosView .ou-astro-sym { font-family: 'Noto Sans Symbols','Noto Sans Symbols 2',serif; font-size: 1.05rem; line-height: 1; }
+#ouranosView .ou-astro-name { font-family: 'Cinzel', serif; font-size: .82rem; letter-spacing: .06em; color: var(--ou-text); }
+#ouranosView .ou-astro-pos { margin-left: auto; font-family: ui-monospace, monospace; font-size: .72rem; color: var(--ou-gold); }
+#ouranosView .ou-astro-tag {
+  font-size: .55rem; text-transform: uppercase; letter-spacing: .1em; padding: .1rem .4rem;
+  border-radius: 4px; background: rgba(74,125,216,.14); border: 1px solid rgba(74,125,216,.3); color: var(--ou-primary);
+}
+#ouranosView .ou-astro-tag.warn { background: rgba(224,85,85,.12); border-color: rgba(224,85,85,.3); color: #E05555; }
+#ouranosView .ou-rows { display: flex; flex-direction: column; gap: .34rem; }
+#ouranosView .ou-rows > div { display: grid; grid-template-columns: 104px 1fr; gap: .55rem; align-items: start; }
+#ouranosView .ou-rows dt {
+  font-family: 'Space Grotesk', sans-serif; font-size: .55rem; font-weight: 600;
+  letter-spacing: .09em; text-transform: uppercase; color: var(--ou-muted); padding-top: .16rem;
+}
+#ouranosView .ou-rows dd { font-size: .72rem; line-height: 1.55; color: var(--ou-text); margin: 0; }
+#ouranosView .ou-rows dd b { font-weight: 600; color: #e6eefb; }
+#ouranosView .ou-rows dd b.g { color: #7AC97A; }
+#ouranosView .ou-rows dd b.w { color: #E0816A; }
+#ouranosView .ou-rows dd b.star { color: #cfe0ff; }
+#ouranosView .ou-empty { color: var(--ou-muted); font-style: italic; }
+#ouranosView .ou-mark { font-family: 'Noto Sans Symbols','Noto Sans Symbols 2',serif; }
+
+/* ---------- tábua e glossário ---------- */
+#ouranosView .ou-dign { width: 100%; margin-top: 1.3rem; padding-top: .9rem; border-top: 1px solid var(--ou-border); }
+#ouranosView .ou-dign summary {
+  cursor: pointer; list-style: none; text-align: center; font-family: 'Space Grotesk', sans-serif;
+  font-size: .62rem; font-weight: 600; text-transform: uppercase; letter-spacing: .12em; color: var(--ou-gold);
+}
+#ouranosView .ou-dign summary::-webkit-details-marker { display: none; }
+#ouranosView .ou-dign summary::after { content: ' ＋'; color: var(--ou-muted); }
+#ouranosView .ou-dign[open] summary::after { content: ' −'; }
+#ouranosView .ou-tab-wrap { overflow-x: auto; margin-top: .9rem; }
+#ouranosView table.ou-tab { width: 100%; min-width: 520px; border-collapse: collapse; font-size: .65rem; }
+#ouranosView table.ou-tab th, #ouranosView table.ou-tab td { border: 1px solid var(--ou-border); padding: .3rem .42rem; text-align: left; color: var(--ou-text); vertical-align: top; }
+#ouranosView table.ou-tab th {
+  font-family: 'Space Grotesk', sans-serif; font-size: .55rem; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .09em; color: var(--ou-muted);
+}
+#ouranosView table.ou-tab td.sym { font-family: 'Noto Sans Symbols','Noto Sans Symbols 2',serif; font-size: .95rem; text-align: center; }
+#ouranosView table.ou-tab em { font-style: normal; color: var(--ou-muted); font-size: .6rem; }
+#ouranosView .ou-gloss { font-size: .66rem; line-height: 1.7; color: var(--ou-muted); margin-top: .9rem; }
+#ouranosView .ou-gloss b { color: var(--ou-text); }
+
+@media (max-width: 480px) {
+  #ouranosView .ou-rows > div { grid-template-columns: 1fr; gap: .08rem; }
+  #ouranosView .ou-astro-pos { margin-left: 0; }
+  #ouranosView .ou-time-clock { font-size: .66rem; }
+}
