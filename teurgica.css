@@ -1,0 +1,130 @@
+/* ======================================================================
+   TEÚRGICA / FESTAS PESSOAIS — folha de estilo dos módulos novos
+   Escopo: #teurgicaView, #festaDialog, prefixos .teu- e .festa-
+   (não altera nenhuma regra existente; foco visível e movimento reduzido
+   vêm das regras globais de calendarium.css)
+   ====================================================================== */
+
+/* ---------- variáveis ---------- */
+#festaDialog, .festa-local, #teurgicaView {
+  --teu-muted: #8197aa;          /* mesmo contraste do --ou-muted */
+  --teu-text: #efe6d2;
+  --teu-gold: #c9a45c;
+  --teu-gold-hi: #f3d08a;
+  --teu-blue: #4a7dd8;
+  --teu-green: #7AC97A;
+  --teu-red: #E05555;
+  --teu-bg: #0b1120;
+}
+
+/* ======================================================================
+   DIÁLOGO "PERSONALIZAR" (botões e campos com estilo próprio completo:
+   o reset de botões da Liturgia não alcança este nó, que fica no <body>)
+   ====================================================================== */
+
+/* <dialog> nativo: sem padding, para que só o fundo (::backdrop) seja alvo de clique fora da caixa */
+dialog#festaDialog {
+  padding: 0; border: 0; background: transparent; color: var(--teu-text);
+  width: min(420px, calc(100vw - 24px)); max-width: none; max-height: calc(100vh - 24px); max-height: calc(100dvh - 24px);
+  margin: auto;   /* o reset "* { margin: 0 }" de calendarium.css anularia o centramento do modal */
+}
+dialog#festaDialog::backdrop { background: rgba(5, 8, 16, .75); }
+
+/* fallback (sem showModal): sobreposição simples */
+#festaDialog.festa-overlay {
+  position: fixed; inset: 0; z-index: 10000; display: flex; justify-content: center; align-items: flex-start;
+  padding: 12px; overflow-y: auto; background: rgba(5, 8, 16, .75); color: var(--teu-text);
+}
+#festaDialog.festa-overlay[hidden] { display: none; }
+#festaDialog.festa-overlay .festa-box { margin: auto 0; max-width: 420px; }
+
+#festaDialog .festa-box {
+  width: 100%; padding: 22px 20px 20px; border-radius: 14px;
+  border: 1px solid rgba(201, 164, 92, .5);
+  background: linear-gradient(160deg, #16213d 0%, #0b1120 85%);
+  box-shadow: 0 18px 60px rgba(0, 0, 0, .65);
+  font-family: 'Jost', system-ui, sans-serif; color: var(--teu-text);
+}
+#festaDialog .festa-h {
+  font-family: 'Cormorant Garamond', serif; font-size: 26px; font-weight: 500; line-height: 1.15;
+  text-align: center; color: var(--teu-gold-hi); margin-bottom: 16px;
+}
+#festaDialog .festa-form { display: flex; flex-direction: column; gap: 14px; }
+#festaDialog :focus-visible { outline-offset: 2px; }
+
+/* calendário cívico */
+#festaDialog .festa-cal-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+#festaDialog .festa-cal-mes { flex: 1; text-align: center; font-family: 'Cinzel', serif; font-size: 14px; letter-spacing: .08em; color: var(--teu-gold); }
+#festaDialog .festa-nav {
+  flex: 0 0 auto; width: 40px; height: 40px; border-radius: 50%; cursor: pointer;
+  border: 1px solid rgba(201, 164, 92, .5); background: transparent; color: var(--teu-gold);
+  font-family: inherit; font-size: 22px; line-height: 1; display: inline-flex; align-items: center; justify-content: center;
+}
+#festaDialog .festa-nav:hover { background: rgba(201, 164, 92, .14); }
+#festaDialog .festa-cal-sem, #festaDialog .festa-cal-grade { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
+#festaDialog .festa-cal-sem span {
+  text-align: center; padding: 2px 0 4px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--teu-muted);
+}
+#festaDialog .festa-dia {
+  min-height: 38px; border-radius: 8px; cursor: pointer;
+  border: 1px solid transparent; background: transparent; color: var(--teu-text);
+  font-family: 'Jost', system-ui, sans-serif; font-size: 14px; font-weight: 400;
+}
+#festaDialog .festa-dia:hover { background: rgba(201, 164, 92, .14); }
+/* dia escolhido: preenchimento + negrito + borda (não depende só da cor; aria-pressed para leitor de tela) */
+#festaDialog .festa-dia[aria-pressed="true"] {
+  background: var(--teu-gold); color: var(--teu-bg); border-color: var(--teu-gold-hi); font-weight: 700;
+}
+
+/* campos */
+#festaDialog .festa-campo { display: flex; flex-direction: column; gap: 5px; }
+#festaDialog .festa-campo label { font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: var(--teu-gold); }
+#festaDialog .festa-campo input, #festaDialog .festa-campo textarea {
+  width: 100%; padding: 9px 10px; border-radius: 8px; border: 1px solid rgba(201, 164, 92, .45);
+  background: var(--teu-bg); color: var(--teu-text); font-family: 'Jost', system-ui, sans-serif; font-size: 16px; line-height: 1.4;
+}
+#festaDialog .festa-campo textarea { resize: vertical; min-height: 76px; }
+#festaDialog .festa-campo input[aria-invalid="true"] { border-color: var(--teu-red); border-width: 2px; }
+#festaDialog .festa-erro { font-size: 13px; line-height: 1.4; color: #E0816A; font-weight: 500; }
+#festaDialog .festa-erro:empty { display: none; }
+#festaDialog .festa-erro:not(:empty)::before { content: '⚠ '; }
+
+/* ações */
+#festaDialog .festa-acoes { display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; margin-top: 2px; }
+#festaDialog .festa-btn {
+  min-height: 40px; padding: 0 18px; border-radius: 8px; cursor: pointer;
+  border: 1px solid rgba(201, 164, 92, .55); background: transparent; color: var(--teu-gold);
+  font-family: 'Jost', system-ui, sans-serif; font-size: 14px; letter-spacing: .04em;
+}
+#festaDialog .festa-btn:hover { background: rgba(201, 164, 92, .14); }
+#festaDialog .festa-btn-ok { background: var(--teu-gold); color: var(--teu-bg); border-color: var(--teu-gold); font-weight: 600; }
+#festaDialog .festa-btn-ok:hover { background: var(--teu-gold-hi); }
+
+@media (max-width: 480px) {
+  #festaDialog .festa-box { padding: 18px 14px 16px; }
+  #festaDialog .festa-dia { min-height: 40px; }
+  #festaDialog .festa-acoes .festa-btn { flex: 1; }
+}
+
+/* ======================================================================
+   ABA 4 — "Festas Locais" (reaproveita .myst-item; ver calendarium.css)
+   ====================================================================== */
+.festa-local { margin-bottom: 56px; }
+.festa-local-title {
+  font-family: 'Cormorant Garamond', serif; font-size: 28px; text-align: center;
+  color: #c9a45c; margin-bottom: 28px; font-weight: 500;
+}
+.festa-local-list { display: grid; gap: 16px; }
+.festa-local-vazio { text-align: center; font-size: 14px; line-height: 1.6; color: var(--teu-muted); }
+.festa-item .myst-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.festa-item .myst-text p { white-space: pre-line; }
+.festa-item.festa-past { opacity: .75; }
+.festa-del {
+  flex: 0 0 auto; align-self: flex-start; width: 40px; height: 40px; border-radius: 50%; cursor: pointer;
+  border: 1px solid rgba(201, 164, 92, .45); background: transparent; color: #c9a45c;
+  font-family: inherit; font-size: 22px; line-height: 1; display: inline-flex; align-items: center; justify-content: center;
+}
+.festa-del:hover { background: rgba(224, 85, 85, .16); border-color: #E05555; color: #E05555; }
+@media (max-width: 480px) {
+  .festa-local-title { font-size: 24px; margin-bottom: 20px; }
+}

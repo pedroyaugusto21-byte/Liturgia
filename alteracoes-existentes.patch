@@ -1,0 +1,203 @@
+--- a/liturgy.js	2026-10-15 19:17:47.336973295 +0000
++++ b/liturgy.js	2026-10-15 19:19:11.215541151 +0000
+@@ -84,6 +84,31 @@
+ const jdToMs = (jd) => (jd - 2440587.5) * DAY_MS;
+ const monthStartDay = (k) => litDay(jdToMs(newMoonJD(k))) + 1;
+ 
++/* ---------- festas pessoais (window.Festas, festas.js) ---------- */
++/* true: a marca azul só aparece no dia da festa; false: marca as festas do mês lunar exibido */
++const FESTAS_SOMENTE_NO_DIA = true;
++const escF = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
++/* Data civil ('AAAA-MM-DD') do dia litúrgico L (que começa às 06:00): inverso de litDay, independe do fuso */
++function civilOfLitDay(L) {
++  try { return new Date(L * DAY_MS).toISOString().slice(0, 10); } catch (e) { return ''; }
++}
++const fmtDataBR = (d) => d.slice(8, 10) + '/' + d.slice(5, 7) + '/' + d.slice(0, 4);
++function festasEm(data) {
++  const F = window.Festas;
++  if (!F || typeof F.byDate !== 'function' || !data) return [];
++  try { return F.byDate(data) || []; } catch (e) { return []; }
++}
++const festasDoDia = (s) => festasEm(civilOfLitDay(s.moonStartDay + s.moonIndex));
++function festasMarks(s) {
++  const out = [];
++  const ini = FESTAS_SOMENTE_NO_DIA ? s.moonIndex : 0, fim = FESTAS_SOMENTE_NO_DIA ? s.moonIndex : s.moonDays - 1;
++  for (let i = ini; i <= fim; i++) {
++    const fs = festasEm(civilOfLitDay(s.moonStartDay + i));
++    if (fs.length) out.push({ i, title: fs.map((f) => f.nome).join(' · ') });
++  }
++  return out;
++}
++
+ function getState(now) {
+   const ms = now.getTime();
+   const hours = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
+@@ -114,7 +139,7 @@
+   const signIndex = Math.floor(lambda / 30);
+   const moonProgress = (moonIndex + litFrac) / moonDays;
+   return {
+-    hours, period, weekIndex, moonIndex, moonDays, phaseName, age, month, signIndex,
++    hours, period, weekIndex, moonIndex, moonDays, moonStartDay: startDay, phaseName, age, month, signIndex,
+     dayAngle: 180 + hours * 15,
+     weekAngle: ((weekIndex + litFrac) / 7) * 360,
+     moonAngle: moonProgress * 360,
+@@ -154,11 +179,11 @@
+   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${ICON_PATHS[type]}</svg>`;
+ }
+ 
+-function dayCore(r, period) {
+-  let g = `<defs><linearGradient id="dawn" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#3b3552"/><stop offset="1" stop-color="#c99a6b"/></linearGradient><linearGradient id="dusk" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#b8776a"/><stop offset="1" stop-color="#3f2c46"/></linearGradient></defs>`;
++function dayCore(r, period, idSuffix = '') {
++  let g = `<defs><linearGradient id="dawn${idSuffix}" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#3b3552"/><stop offset="1" stop-color="#c99a6b"/></linearGradient><linearGradient id="dusk${idSuffix}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#b8776a"/><stop offset="1" stop-color="#3f2c46"/></linearGradient></defs>`;
+   g += `<path d="${sector(0, r, 90, 270)}" fill="#0f1830"/>`;
+-  g += `<path d="${sector(0, r, 270, 360)}" fill="url(#dawn)" opacity="0.85"/>`;
+-  g += `<path d="${sector(0, r, 0, 90)}" fill="url(#dusk)" opacity="0.85"/>`;
++  g += `<path d="${sector(0, r, 270, 360)}" fill="url(#dawn${idSuffix})" opacity="0.85"/>`;
++  g += `<path d="${sector(0, r, 0, 90)}" fill="url(#dusk${idSuffix})" opacity="0.85"/>`;
+   for (let h = 0; h < 24; h++) {
+     const a = 180 + h * 15;
+     const [x1, y1] = polar(r - (h % 6 === 0 ? 12 : 6), a), [x2, y2] = polar(r, a);
+@@ -177,14 +202,17 @@
+   return ring(r1, r2, 7, 0, active, (i, x, y, on) =>
+     `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="central" font-size="28" fill="${on ? '#f3d08a' : '#e8dcc0'}" opacity="${on ? 1 : 0.75}" style="font-family:${SYMBOL_FONT}">${WEEK[i].sym}</text>`);
+ }
+-function moonRing(r1, r2, count, active) {
++function moonRing(r1, r2, count, active, marks) {
+   const phases = { 1: 'new', [Math.round(count / 4)]: 'first', [Math.round(count / 2)]: 'full', [Math.round(3 * count / 4)]: 'last' };
+-  return ring(r1, r2, count, 0, active, (i, x, y, on) => {
++  const base = ring(r1, r2, count, 0, active, (i, x, y, on) => {
+     const day = i + 1;
+     return phases[day]
+       ? moonGlyph(x, y, 9, phases[day])
+       : `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="central" font-size="10" fill="${on ? '#f3d08a' : '#e8dcc0'}" opacity="${on ? 1 : 0.45}" style="font-family:'Jost',sans-serif">${day}</text>`;
+   });
++  if (!marks || !marks.length) return base;
++  const step = 360 / count;
++  return base + marks.map((mk) => `<path d="${sector(r1, r2, mk.i * step, (mk.i + 1) * step)}" fill="rgba(120,160,230,.28)" stroke="#4a7dd8" stroke-width="1.6"><title>${escF(mk.title)}</title></path>`).join('');
+ }
+ function monthRing(r1, r2, active) {
+   return ring(r1, r2, 12, 0, active, (i, x, y, on) =>
+@@ -221,7 +249,7 @@
+   g += zodiacRing(345, 420, s.signIndex);
+   g += seasonRing(282, 345, s.month);
+   g += monthRing(230, 282, s.month);
+-  g += moonRing(170, 230, s.moonDays, s.moonIndex);
++  g += moonRing(170, 230, s.moonDays, s.moonIndex, festasMarks(s));
+   g += weekRing(110, 170, s.weekIndex);
+   g += dayCore(110, s.period);
+   g += hand(s.weekAngle, 110, 158, '#efe6d2');
+@@ -264,6 +292,8 @@
+     ['#e0906a', 'Mês', monthName(s.month), `Mês ${ROMAN[s.month]}`],
+     ['#a9c4a4', 'Sol em', ZODIAC[s.signIndex].name, ZODIAC[s.signIndex].sym],
+   ];
++  const fd = festasDoDia(s);
++  if (fd.length) rows.push(['#4a7dd8', 'Festa', escF(fd.map((f) => f.nome).join(' · ')), fmtDataBR(fd[0].data)]);
+   return rows.map(([c, l, v, d]) =>
+     `<div class="row"><span class="dot" style="background:${c};box-shadow:0 0 10px ${c}"></span><span class="label">${l}</span><div class="val"><p class="v">${v}</p><p class="d">${d}</p></div></div>`).join('');
+ }
+@@ -313,5 +343,65 @@
+   const s = getState(now);
+   document.getElementById('mystClockdiv').innerHTML = buildMystSVG(s);
+   document.getElementById('mystList').innerHTML = buildMystList();
++  mystLocalRender();
+ };
++
++/* ---------- aba 4: Festas Locais ---------- */
++const FESTA_PENA = '<svg aria-hidden="true" focusable="false" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#c9a45c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z"/><path d="M16 8 2 22"/><path d="M17.5 15H9"/></svg>';
++function mystLocalRender() {
++  const el = document.getElementById('mystLocal');
++  if (!el) return;
++  let lista = [];
++  try { lista = (window.Festas && window.Festas.list()) || []; } catch (e) { lista = []; }
++  const hoje = civilOfLitDay(litDay(simTime));
++  const itens = lista.map((f) => {
++    const passada = f.data < hoje;
++    const nome = escF(f.nome);
++    return `<div class="myst-item festa-item${passada ? ' festa-past' : ''}"><div class="myst-icon">${FESTA_PENA}</div><div class="myst-text"><h3>${nome} <span class="myst-date">· ${fmtDataBR(f.data)}${passada ? ' · passada' : ''}</span></h3>${f.descricao ? `<p>${escF(f.descricao)}</p>` : ''}</div><button type="button" class="festa-del" data-id="${escF(f.id)}" aria-label="Remover festa ${nome}" title="Remover festa"><span aria-hidden="true">×</span></button></div>`;
++  }).join('');
++  el.innerHTML = `<div class="festa-local"><h2 class="festa-local-title" tabindex="-1">Festas Locais</h2>${itens ? `<div class="festa-local-list">${itens}</div>` : '<p class="festa-local-vazio">Nenhuma festa pessoal registrada. Use "Personalizar" na aba Liturgia.</p>'}</div>`;
++}
++(function () {
++  const el = document.getElementById('mystLocal');
++  if (!el) return;
++  el.addEventListener('click', (e) => {
++    const b = e.target.closest && e.target.closest('.festa-del');
++    if (!b || !window.Festas) return;
++    const id = b.getAttribute('data-id');
++    const f = window.Festas.list().find((x) => x.id === id);
++    if (!f) return;
++    let ok = false;
++    try { ok = typeof window.confirm === 'function' && window.confirm('Remover a festa "' + f.nome + '"?') === true; } catch (err) { ok = false; }
++    if (!ok) return;
++    window.Festas.remove(id);
++    const h = el.querySelector('h2');           /* o botão some: leva o foco ao título da seção */
++    if (h) { try { h.focus({ preventScroll: true }); } catch (err) { /* ignora */ } }
++  });
++})();
++
++/* ---------- kit para as etapas 2 e 3 (sem efeito visível agora) ---------- */
++let dialSeq = 0;
++function dialSVG(horas, opts) {
++  let h = Number(horas); if (!isFinite(h)) h = 0;
++  h = ((h % 24) + 24) % 24;
++  const tot = Math.floor(h * 60 + 1e-6) % 1440;
++  const raw = opts && opts.id != null ? String(opts.id).replace(/[^\w-]/g, '_') : '';
++  const sfx = '-' + (raw || 'dial' + (++dialSeq));            /* IDs únicos: nunca colidem com os do relógio principal */
++  const period = h >= 6 && h < 12 ? 'Amanhecer (🜢)' : h >= 12 && h < 18 ? 'Entardecer (🜬)' : 'Noite (✧)';
++  const [x, y] = polar(96, 180 + h * 15);
++  return `<svg viewBox="375 375 250 250" class="dial" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Mostrador de 24 horas, ${pad(Math.floor(tot / 60))}:${pad(tot % 60)}" focusable="false">${dayCore(110, period, sfx)}${sunTip(x, y, 6)}</svg>`;
++}
++function moonInfo(date) {
++  const ms = date instanceof Date ? date.getTime() : Number(date);
++  if (!isFinite(ms)) return null;
++  const jd = ms / DAY_MS + 2440587.5;
++  let k = Math.floor((jd - 2451550.09765) / 29.530588853);
++  while (newMoonJD(k + 1) <= jd) k++;
++  while (newMoonJD(k) > jd) k--;
++  const nm0 = newMoonJD(k), nm1 = newMoonJD(k + 1);
++  const age = jd - nm0, frac = age / (nm1 - nm0);
++  const phaseIndex = Math.floor(frac * 8 + 0.5) % 8;
++  return { age, frac, elong: frac * 360, phaseName: PHASES[phaseIndex], phaseIndex };
++}
++window.LiturgyKit = { dialSVG, moonInfo, civilOfLitDay, WEEK, PHASES, litDay };
+ })();
+--- a/index.html	2026-10-15 19:17:47.260973295 +0000
++++ b/index.html	2026-10-15 19:19:24.314567454 +0000
+@@ -10,6 +10,7 @@
+ <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@300;400;500;600&family=Jost:wght@300;400;500&family=Noto+Sans+Symbols&family=Noto+Sans+Symbols+2&family=Raleway:wght@300;400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+ <link rel="stylesheet" href="astral.css">
+ <link rel="stylesheet" href="calendarium.css">
++<link rel="stylesheet" href="teurgica.css">
+ </head>
+ <body>
+ 
+@@ -98,6 +99,12 @@
+               Mistérios
+             </button>
+           </div>
++          <div class="ctl-row">
++            <button class="btn btn-lyra" id="btnPersonalizar">
++              <svg aria-hidden="true" focusable="false" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z"/><path d="M16 8 2 22"/><path d="M17.5 15H9"/></svg>
++              Personalizar
++            </button>
++          </div>
+         </div>
+       </aside>
+     </div>
+@@ -111,6 +118,7 @@
+       <p class="lede">O ciclo sagrado dos Mistérios Órficos — os oito festivais que marcam o ano litúrgico.</p>
+       <div class="myst-clock-wrap" id="mystClockdiv"></div>
+       <div class="myst-list" id="mystList"></div>
++      <div class="myst-local" id="mystLocal"></div>
+       <div class="myst-ritual">
+         <h2>Ritualística Básica Órfica</h2>
+         <ol>
+@@ -213,6 +221,8 @@
+   </div>
+ 
+ <script src="ouranos-data.js"></script>
++<script src="store.js"></script>
++<script src="festas.js"></script>
+ <script src="liturgy.js"></script>
+ <script src="lunar.js"></script>
+ <script src="ouranos.js"></script>

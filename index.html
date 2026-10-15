@@ -10,6 +10,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@300;400;500;600&family=Jost:wght@300;400;500&family=Noto+Sans+Symbols&family=Noto+Sans+Symbols+2&family=Raleway:wght@300;400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="astral.css">
 <link rel="stylesheet" href="calendarium.css">
+<link rel="stylesheet" href="teurgica.css">
 </head>
 <body>
 
@@ -98,6 +99,12 @@
               Mistérios
             </button>
           </div>
+          <div class="ctl-row">
+            <button class="btn btn-lyra" id="btnPersonalizar">
+              <svg aria-hidden="true" focusable="false" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z"/><path d="M16 8 2 22"/><path d="M17.5 15H9"/></svg>
+              Personalizar
+            </button>
+          </div>
         </div>
       </aside>
     </div>
@@ -111,6 +118,7 @@
       <p class="lede">O ciclo sagrado dos Mistérios Órficos — os oito festivais que marcam o ano litúrgico.</p>
       <div class="myst-clock-wrap" id="mystClockdiv"></div>
       <div class="myst-list" id="mystList"></div>
+      <div class="myst-local" id="mystLocal"></div>
       <div class="myst-ritual">
         <h2>Ritualística Básica Órfica</h2>
         <ol>
@@ -213,6 +221,8 @@
   </div>
 
 <script src="ouranos-data.js"></script>
+<script src="store.js"></script>
+<script src="festas.js"></script>
 <script src="liturgy.js"></script>
 <script src="lunar.js"></script>
 <script src="ouranos.js"></script>
