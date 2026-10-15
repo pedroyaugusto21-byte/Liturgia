@@ -81,6 +81,24 @@
 #ouranosView .ou-gloss { font-size: .66rem; line-height: 1.7; color: var(--ou-muted); margin-top: .9rem; }
 #ouranosView .ou-gloss b { color: var(--ou-text); }
 
+/* ---------- aviso de efemérides, notas e grupos (B1–B6) ---------- */
+#ouranosView .ou-ephem-warn {
+  display: none; text-align: center; font-size: .66rem; line-height: 1.5; padding: .3rem .5rem;
+  border-radius: 7px; border: 1px solid rgba(224,85,85,.3); background: rgba(224,85,85,.1); color: #E0816A;
+}
+#ouranosView .ou-ephem-warn.on { display: block; }
+#ouranosView .ou-note {
+  font-size: .68rem; line-height: 1.6; color: var(--ou-muted); padding: .55rem .8rem;
+  border: 1px dashed var(--ou-border); border-radius: 10px;
+}
+#ouranosView .ou-note b { color: var(--ou-text); font-weight: 600; }
+#ouranosView .ou-note b.w { color: #E0816A; }
+#ouranosView h3.ou-group {
+  margin: .9rem 0 .1rem; font-family: 'Space Grotesk', sans-serif; font-size: .6rem; font-weight: 600;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--ou-gold);
+}
+#ouranosView .ou-dign p.ou-gloss i { font-style: italic; }
+
 @media (max-width: 480px) {
   #ouranosView .ou-rows > div { grid-template-columns: 1fr; gap: .08rem; }
   #ouranosView .ou-astro-pos { margin-left: 0; }

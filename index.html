@@ -1328,7 +1328,7 @@ function computeAstral(date,L){
     const lon=pos[KEYS[i]],d=((later[KEYS[i]]-lon+540)%360)-180;
     return {...p,lon,retro:i!==0&&i!==3&&d<0,z:zodiacPos(lon)};
   });
-  return {date,solarH,civilH,eot,dec:dec/D2R,rise,set,polar,alt,known,off,bodies,laterLons:KEYS.map(k=>later[k]),sunLon:pos.sun,elong:pos.elongation,sunAng:180+solarH*15};
+  return {date,solarH,civilH,eot,dec:dec/D2R,rise,set,polar,alt,known,off,bodies,laterLons:KEYS.map(k=>later[k]),sunLon:pos.sun,elong:pos.elongation,sunAng:180+solarH*15,lat:known?L.lat:null,lon:L.lon};
 }
 function buildAstralSVG(A){
   const cx=AS.cx,cy=AS.cy,rD=AS.rD,rS0=AS.rS0,rS1=AS.rS1;
@@ -1415,6 +1415,8 @@ function buildAstralSVG(A){
 
   /* estrelas fixas em conjunção — desenho vindo do módulo astral (astral.js) */
   if(window.AstralStars)s+=AstralStars.svg(A,{ang:ang,P:P,f:f,rOrb:rOrb,ha:ha,rS0:rS0});
+  /* Ascendente e Meio do Céu — desenho vindo do módulo astral (astral.js) */
+  if(window.AstralPoints)s+=AstralPoints.svg(A,{ang:ang,P:P,f:f,ha:ha,rS0:rS0,rS1:rS1});
 
   /* rótulos das direções do mostrador */
   const lab=`font-size="12" letter-spacing="3" fill="#5b7183" text-anchor="middle" dominant-baseline="central" style="${UI};font-style:italic"`;
