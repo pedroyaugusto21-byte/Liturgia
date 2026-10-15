@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Calendarium — Calendários</title>
+<meta name="description" content="Ciclo Sagrado — o tempo litúrgico, lunar e uraniano em três calendários circulares.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@300;400;500;600&family=Jost:wght@300;400;500&family=Noto+Sans+Symbols&family=Noto+Sans+Symbols+2&family=Raleway:wght@300;400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="astral.css">
+<link rel="stylesheet" href="calendarium.css">
+</head>
+<body>
+
+  <!-- INTRO -->
+  <div class="intro" id="intro" aria-hidden="true">
+    <svg class="intro-stage" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <radialGradient id="earthGrad" cx="35%" cy="35%" r="70%">
+          <stop offset="0%" stop-color="#7fd8c9"/>
+          <stop offset="55%" stop-color="#2f7a6b"/>
+          <stop offset="100%" stop-color="#12312c"/>
+        </radialGradient>
+      </defs>
+      <circle class="intro-ring" cx="150" cy="150" r="45" fill="none" stroke="#efe6d2" stroke-width="1.2"/>
+      <circle class="intro-ring" cx="150" cy="150" r="70" fill="none" stroke="#b9c6db" stroke-width="1.2"/>
+      <circle class="intro-ring" cx="150" cy="150" r="95" fill="none" stroke="#e0906a" stroke-width="1.2"/>
+      <circle class="intro-ring" cx="150" cy="150" r="118" fill="none" stroke="#a9c4a4" stroke-width="1.2"/>
+      <circle class="intro-ring" cx="150" cy="150" r="138" fill="none" stroke="rgba(201,164,92,0.6)" stroke-width="1"/>
+      <circle class="intro-orbit-path" cx="150" cy="150" r="100" fill="none" stroke="rgba(201,164,92,0.25)" stroke-dasharray="4 6"/>
+      <circle class="intro-orbit-path" cx="150" cy="150" r="55" fill="none" stroke="rgba(185,198,219,0.25)" stroke-dasharray="3 5"/>
+      <circle id="introEarth" cx="150" cy="150" r="18" fill="url(#earthGrad)"/>
+      <g id="introOrbitGroup"><circle cx="250" cy="150" r="10" fill="#f3d08a" style="filter:drop-shadow(0 0 6px #f3d08a)"/></g>
+      <g id="introMoonGroup"><circle cx="205" cy="150" r="6" fill="#b9c6db"/></g>
+      <g id="introPointer">
+        <line x1="150" y1="150" x2="150" y2="90" stroke="#f3d08a" stroke-width="3" stroke-linecap="round"/>
+        <circle cx="150" cy="90" r="6" fill="#f3d08a" style="filter:drop-shadow(0 0 6px #f3d08a)"/>
+        <circle cx="150" cy="150" r="5" fill="#0b1120" stroke="#f3d08a" stroke-width="2"/>
+      </g>
+    </svg>
+    <p class="intro-title">Calendarium</p>
+  </div>
+
+  <!-- ESCOLHA: Sol · Lua · Urano · Lira -->
+  <div class="choice" id="choice">
+    <p class="choice-title">Calendarium</p>
+    <div class="choice-btns">
+      <button class="choice-btn choice-sun" id="chooseSun" aria-label="Calendário Litúrgico">
+        <span class="sym">☉&#xFE0E;</span><span class="name">Liturgia</span>
+      </button>
+      <button class="choice-btn choice-moon" id="chooseMoon" aria-label="Calendário Lunar">
+        <span class="sym">☽&#xFE0E;</span><span class="name">Lunar</span>
+      </button>
+      <button class="choice-btn choice-uranus" id="chooseUranus" aria-label="Esfera Celeste">
+        <span class="sym">♅</span><span class="name">Urano</span>
+      </button>
+      <button class="choice-btn choice-lyra" id="chooseLyra" aria-label="Mistérios e Festas Litúrgicas">
+        <span class="sym"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M7 5.2h10"/><path d="M7 5.2Q4.4 9.6 8 15"/><path d="M17 5.2Q19.6 9.6 16 15"/><path d="M8 15a4 2.9 0 0 0 8 0"/><path d="M8.8 6.2v10.54"/><path d="M10.4 6.2v11.46"/><path d="M12 6.2v11.7"/><path d="M13.6 6.2v11.46"/><path d="M15.2 6.2v10.54"/></svg></span><span class="name">Mistérios</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- NAVEGAÇÃO ENTRE ABAS -->
+  <div class="nav-cluster" id="navCluster"></div>
+  <button id="menuBtn" aria-label="Voltar ao menu inicial">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/></svg>
+  </button>
+
+  <!-- LITURGIA -->
+  <div id="liturgyView">
+    <div class="wrap">
+      <div class="clock-wrap" id="clockdiv"></div>
+      <aside>
+        <p class="eyebrow">Calendarium</p>
+        <h1>Calendário Litúrgico Circular</h1>
+        <p class="lede">Seis círculos do tempo — o dia, a semana, a lua, os meses, as estações e os signos do zodíaco . O dia litúrgico começa ao amanhecer, aproximadamente às 06:00h ; tem seu apice ao meio-dia (⛢), declina-se ao entardecer (🜬) e após um novo anoitecer (✧), recomeça quando vier a Aurora.</p>
+        <div class="info" id="info"></div>
+        <div class="controls">
+          <div class="ctl-head">
+            <span class="eyebrow">Controle do tempo</span>
+            <span class="mode" id="modeLabel">Ao vivo</span>
+          </div>
+          <div class="ctl-row">
+            <button class="btn btn-now" id="btnNow">🕐 Agora</button>
+            <input type="datetime-local" id="dt">
+          </div>
+          <div class="ctl-row">
+            <button class="btn" id="btnPast">⏪ Passado</button>
+            <button class="btn-play" id="btnPlay">▶ Reproduzir</button>
+            <button class="btn" id="btnFut">Futuro ⏩</button>
+          </div>
+          <div class="speeds" id="speeds"></div>
+          <div class="ctl-row" style="margin-top:6px">
+            <button class="btn btn-lyra" id="btnMysteries">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 5.2h10"/><path d="M7 5.2Q4.4 9.6 8 15"/><path d="M17 5.2Q19.6 9.6 16 15"/><path d="M8 15a4 2.9 0 0 0 8 0"/><path d="M8.8 6.2v10.54"/><path d="M10.4 6.2v11.46"/><path d="M12 6.2v11.7"/><path d="M13.6 6.2v11.46"/><path d="M15.2 6.2v10.54"/></svg>
+              Mistérios
+            </button>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <!-- MISTÉRIOS -->
+  <div id="mysteriesView">
+    <div class="myst-wrap">
+      <p class="eyebrow">Calendarium</p>
+      <h1>Mistérios e Festas Litúrgicas</h1>
+      <p class="lede">O ciclo sagrado dos Mistérios Órficos — os oito festivais que marcam o ano litúrgico.</p>
+      <div class="myst-clock-wrap" id="mystClockdiv"></div>
+      <div class="myst-list" id="mystList"></div>
+      <div class="myst-ritual">
+        <h2>Ritualística Básica Órfica</h2>
+        <ol>
+          <li><span class="step-n">1</span><div class="step-body"><h3>Preparação</h3><p>Dispor o espaço sagrado, os utensílios e as oferendas; acender a lâmpada ou o fogo lustral e recolher o espírito para o rito; sugere-se o uso das contas de oração para concentração; para consagração da chama ritual sugere-se o Hino Órfico à Héstia. - Para a consagração do Espaço Sagrado, após a purificação, sugere-se a invocação dos Quatro Pilares do Kosmos , os Titãs Coeus (Ꚅ) (Norte); Hiperion (🜾)(Leste), Jápeto (🜩)(Oeste), Krios (🝒)(Sul).</p> 
+
+    </div></li>
+
+          <li><span class="step-n">2</span><div class="step-body"><h3>Purificação</h3><p>Aspersão com água lustral (khernips) e abluções que afastam a miasma, preparando corpo e alma para a presença do divino; - Para a preparação da Água Lustral: abençoe uma água no recipiente, convidando-a à servir para os propósitos da Arte; depois queime uma folha ou ramo invocado corretamente na chama de Vesta e com a chama do ramo, mergulhe na água para torná-la purificadora.</p></div></li>
+
+          <li><span class="step-n">3</span><div class="step-body"><h3>Convite / Invocação</h3><p>Chamar os deuses e daimones com hinos, preces e gestos, abrindo a ponte entre o mortal e o imortal; os Hinos Órficos são sugeridos para essa parte do rito, orações pessoais e preces íntimas também são bem vindas, uma vez que o intuíto é convidar os Espíritos à participarem do Sacro Rtual, sugerimos inclusive que as orações sejam acompanhadas de música, de preferência por parte do oficiante.</p></div></li>
+
+          <li><span class="step-n">4</span><div class="step-body"><h3>Intento Ritual</h3><p>Proclamar o propósito do rito; oferecer libações, incenso e o coração da devoção — o ato central da liturgia; é neste momento do rito em que acontece a comunhão, a celebração ritual própriamente dita, seja ela de caráter devocional ou prático; no caso dos rituais dos Mistérios é nesse momento do ato litúrgico onde a Teleté acontece; Consagrações, encantamentos, conjuros, invocações práticas e outros atos Mágicos tem seu lugar aqui.</p></div></li>
+
+          <li><span class="step-n">5</span><div class="step-body"><h3>Despedidas</h3><p>Agradecer e despedir com reverência as entidades convocadas, encerrando a comunhão de modo digno; da mesma forma que o Círculo foi convocado deve ser despedido: com respeito e dignidade; despedem-se de todos os Deuses nomeados e não nomeados que participaram do Ato.</p></div></li>
+
+          <li><span class="step-n">6</span><div class="step-body"><h3>Purificação</h3><p>Nova aspersão e ablução ao encerrar, restaurando o equilíbrio e a pureza do espaço e dos participantes.</p></div></li>
+
+          <li><span class="step-n">7</span><div class="step-body"><h3>Finalização</h3><p>Apagar o fogo sagrado, guardar os utensílios e selar o rito; retornar ao mundo profano transformado; o rito só acaba quando todos os objetos estão no lugar e a chama foi respeitosamente abafada com uma prece.</p></div></li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <!-- LUNAR -->
+  <div id="lunarView">
+    <div class="app">
+      <div class="card">
+        <div class="header">
+          <span class="header-ornament">· · ·</span>
+          <h1>☽ Calendário Lunar ☾</h1>
+          <div class="subtitle">Visualização das Fases da Lua em relação ao Mês cívico</div>
+        </div>
+        <div class="nav">
+          <button class="nav-btn" onclick="changeMonth(-1)" aria-label="Mês anterior">‹</button>
+          <div class="month-year" id="monthYear"></div>
+          <button class="nav-btn" onclick="changeMonth(1)" aria-label="Próximo mês">›</button>
+        </div>
+        <div class="hover-info" id="hoverInfo">Passe o mouse sobre um dia</div>
+        <div class="canvas-wrap"><canvas id="moonCanvas"></canvas></div>
+        <div class="phases-title">Fases Principais</div>
+        <div class="phase-grid" id="phaseGrid"></div>
+        <div class="lunar-note">
+          <div class="note-title">A Lua Nova — Noumênia</div>
+          <p>A Lua nova, ou Noumênia, marca o início de um Mês Litúrgico, bem como o ritual de limpeza e re-consagração, purificação e comunhão de um Lar; neste rito celebram-se Héstia ( ⚻ ), Agathos-Daimon ( 🜍 ), Hécate ( Ⱛ ) e todos os deuses da devoção pessoal do órfico.</p>
+        </div>
+        <div class="footer">Ciclo lunar · 29,53 dias · Cálculo astronômico</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Esfera Armilar — ANIMA MUNDI -->
+  <div id="ouranosView">
+    <div class="ou-inner">
+      <h1>Esfera Armilar — Anima Mundi</h1>
+      <p class="subtitle">Cosmologia do Timeu: a esfera das estrelas fixas, o zodíaco e os 7 astros errantes nas suas posições astronômicas reais.</p>
+      <div id="ou-canvas-wrap"><canvas id="ou-canvas" width="700" height="560"></canvas></div>
+      <div id="ou-astral-wrap"><div id="ou-astral-svg"></div></div>
+      <div id="ou-info-bar">✨ Passe o mouse sobre a esfera para explorar</div>
+      <div class="ou-controls">
+        <div class="ou-pills" id="ou-mode-group">
+          <button class="ou-pill" data-mode="stars">★ Estrelas</button>
+          <button class="ou-pill active" data-mode="both">◉ Dupla</button>
+          <button class="ou-pill" data-mode="rings">○ Anéis</button>
+          <button class="ou-pill" data-mode="timeu">◎ Timeu</button>
+          <button class="ou-pill" data-mode="astral">✦ Mapa Astral</button>
+        </div>
+        <div id="ou-snapshot-banner" class="ou-sky-only">
+          <span>📌 Céu congelado em:</span>
+          <span class="snap-time" id="ou-snap-time"></span>
+          <button id="ou-clear-snap">✕ Liberar</button>
+        </div>
+        <div class="ou-zoom-row ou-sky-only"><label>Zoom</label><input type="range" id="ou-zoom" min="80" max="500" value="155" /></div>
+        <div class="ou-row ou-sky-only">
+          <button class="ou-btn" id="ou-pause-btn">⏸ Pausar</button>
+          <button class="ou-btn" id="ou-snap-btn">📌 Posição Atual</button>
+          <button class="ou-btn" id="ou-reset-btn">↺ Resetar</button>
+        </div>
+        <div class="ou-zoom-row ou-sky-only">
+          <span class="ou-speed-label">Velocidade:</span>
+          <div class="ou-pills" id="ou-speed-group">
+            <button class="ou-pill active" data-spd="1">1×</button>
+            <button class="ou-pill" data-spd="5">5×</button>
+            <button class="ou-pill" data-spd="20">20×</button>
+            <button class="ou-pill" data-spd="100">100×</button>
+            <button class="ou-pill" data-spd="500">500×</button>
+          </div>
+        </div>
+      </div>
+      <div id="ou-astral-panel">
+        <div class="ou-row"><button class="ou-btn" id="ou-loc-btn">📍 Atualizar localização</button></div>
+        <div class="ou-astral-grid" id="ou-astral-grid"></div>
+      </div>
+      <div class="ou-legend" id="ou-legend"></div>
+      <details class="ou-catalog" id="ou-catalog" open>
+        <summary>Catálogo de símbolos das constelações</summary>
+        <div class="ou-cat-grid" id="ou-cat-grid"></div>
+        <p class="ou-credit">88 constelações · símbolos caligráficos de <a href="https://www.suberic.net/~dmm/astro/constellations.html" target="_blank" rel="noopener">Denis Moskowitz</a> (suberic.net)</p>
+      </details>
+    </div>
+  </div>
+
+<script src="ouranos-data.js"></script>
+<script src="liturgy.js"></script>
+<script src="lunar.js"></script>
+<script src="ouranos.js"></script>
+<script src="app.js"></script>
+<script src="astral.js"></script>
+</body>
+</html>

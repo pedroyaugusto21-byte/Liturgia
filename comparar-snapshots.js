@@ -1,0 +1,3 @@
+const a=require(process.argv[2]).snaps,b=require(process.argv[3]);let ok=true;
+for(const k in a){for(const f of ['svg','grid','list','clock','info']){const same=a[k][f]===b.snaps[k][f];if(!same){ok=false;let i=0;const x=a[k][f],y=b.snaps[k][f];while(x[i]===y[i])i++;console.log('DIFERE',k,f,'na posição',i,'\n  antes :',JSON.stringify(x.slice(Math.max(0,i-40),i+80)),'\n  depois:',JSON.stringify(y.slice(Math.max(0,i-40),i+80)));}}}
+console.log(ok?'IDÊNTICO: svg, grade, leitura, relógio e barra de info em 3 datas':'HÁ DIFERENÇAS');console.log('erros no console (depois):',b.errors.length,b.errors.slice(0,3));
