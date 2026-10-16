@@ -65,13 +65,15 @@
     agendar(() => encerrarIntro(), 14000);
   }
 
-  const VIEW_IDS = { sun: 'liturgyView', moon: 'lunarView', uranus: 'ouranosView', lyra: 'mysteriesView' };
+  const VIEW_IDS = { sun: 'liturgyView', moon: 'lunarView', uranus: 'ouranosView', lyra: 'mysteriesView', teurgica: 'teurgicaView' };
   const LYRE_SVG = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 5.2h10"/><path d="M7 5.2Q4.4 9.6 8 15"/><path d="M17 5.2Q19.6 9.6 16 15"/><path d="M8 15a4 2.9 0 0 0 8 0"/><path d="M8.8 6.2v10.54"/><path d="M10.4 6.2v11.46"/><path d="M12 6.2v11.7"/><path d="M13.6 6.2v11.46"/><path d="M15.2 6.2v10.54"/></svg>';
+  const ALTAR_SVG = '<svg aria-hidden="true" focusable="false" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5h14"/><path d="M7.5 12.5V19"/><path d="M16.5 12.5V19"/><path d="M4 19.5h16"/><path d="M12 11.3c-1.9-1.5-2.1-3.3 0-6.5 2.1 3.2 1.9 5 0 6.5z"/></svg>';
   const VIEWS = [
     { id: 'sun', sym: '☉\uFE0E', cls: 'sun-target', label: 'Calendário Litúrgico', svg: false },
     { id: 'moon', sym: '☽\uFE0E', cls: 'moon-target', label: 'Calendário Lunar', svg: false },
     { id: 'uranus', sym: '♅', cls: 'uranus-target', label: 'Calendário de Urano', svg: false },
     { id: 'lyra', sym: null, cls: 'lyra-target', label: 'Mistérios e Festas', svg: true },
+    { id: 'teurgica', sym: null, cls: 'teurgica-target', label: 'Teúrgica', svg: true, icon: ALTAR_SVG },
   ];
   const navCluster = document.getElementById('navCluster');
   const menuBtn = document.getElementById('menuBtn');
@@ -93,7 +95,7 @@
       b.className = 'nav-btn ' + vw.cls;
       b.setAttribute('aria-label', vw.label);
       b.title = vw.label;
-      if (vw.svg) b.innerHTML = LYRE_SVG; else b.textContent = vw.sym;
+      if (vw.svg) b.innerHTML = vw.icon || LYRE_SVG; else b.textContent = vw.sym;
       b.onclick = () => showView(vw.id);
       navCluster.appendChild(b);
     });
@@ -107,6 +109,7 @@
     if (v === 'moon') window.lunarRender();
     if (v === 'lyra') window.mystRender();
     if (v === 'uranus') Ouranos.activate(); else Ouranos.deactivate();
+    if (window.Teurgica) { if (v === 'teurgica') Teurgica.activate(); else Teurgica.deactivate(); }
     window.scrollTo(0, 0);
     lunarView.scrollTop = 0;
     navCluster.style.display = 'flex';
@@ -122,6 +125,7 @@
   function showMenu() {
     for (const k in VIEW_IDS) document.getElementById(VIEW_IDS[k]).style.display = 'none';
     Ouranos.deactivate();
+    if (window.Teurgica) Teurgica.deactivate();
     navCluster.style.display = 'none';
     menuBtn.style.display = 'none';
     currentView = null;
@@ -136,6 +140,7 @@
   document.getElementById('chooseMoon').onclick = () => showView('moon');
   document.getElementById('chooseUranus').onclick = () => showView('uranus');
   document.getElementById('chooseLyra').onclick = () => showView('lyra');
+  document.getElementById('chooseTeurgica').onclick = () => showView('teurgica');
   document.getElementById('btnMysteries').onclick = () => showView('lyra');
   menuBtn.onclick = showMenu;
 
