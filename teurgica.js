@@ -82,16 +82,55 @@
     } catch (e) { return []; }
   }
 
-  /* resumo síncrono de um registro: { data, temTexto, caracteres, clima, tags:{tag:n}, total, periodosComClima } */
-  function resumirDia(reg) {
-    const r = normalizarRegistro(reg);
-    if (!r) return null;
-    const tags = {}; let total = 0, periodos = 0;
-    PERIODOS.forEach((p) => { if (r.clima[p].length) periodos++; r.clima[p].forEach((t) => { tags[t] = (tags[t] || 0) + 1; total++; }); });
-    return { data: r.data, temTexto: r.texto.trim().length > 0, caracteres: r.texto.length, clima: r.clima, tags, total, periodosComClima: periodos };
+  /* Promise<log[]> de salvamentos (diario_log) entre duas datas civis (inclusive), em ordem de salvamento.
+     Descarta linhas malformadas; uma única leitura por período. */
+  async function listarLogs(de, ate) {
+    const S = store();
+    if (!S || !dataValida(de) || !dataValida(ate)) return [];
+    try {
+      const todos = await S.getAll('diario_log');
+      return (Array.isArray(todos) ? todos : [])
+        .filter((l) => l && typeof l === 'object' && typeof l.data === 'string' && l.data >= de && l.data <= ate && dataValida(l.data))
+        .sort((a, b) => (String(a.salvoEm) < String(b.salvoEm) ? -1 : String(a.salvoEm) > String(b.salvoEm) ? 1 : 0));
+    } catch (e) { return []; }
   }
 
-  window.TeurgicaData = { TAGS, PERIODOS, EXCLUSOES, resumirDia, carregarDia, listarPeriodo };
+  /* "a", "a e b", "a, b e c" */
+  function juntarTags(lista) {
+    if (lista.length <= 1) return lista.join('');
+    return lista.slice(0, -1).join(', ') + ' e ' + lista[lista.length - 1];
+  }
+
+  /* Tags em destaque: as que aparecem em pelo menos 2 dos 3 horários; se nenhuma chega a 2,
+     as de maior contagem. Ordem: mais frequentes primeiro, depois a ordem de TAGS. */
+  function destacarTags(tags) {
+    const presentes = TAGS.filter((t) => tags[t] > 0);
+    if (!presentes.length) return [];
+    const max = Math.max.apply(null, presentes.map((t) => tags[t]));
+    const corte = max >= 2 ? 2 : max;
+    return presentes.filter((t) => tags[t] >= corte)
+      .sort((a, b) => (tags[b] - tags[a]) || (TAGS.indexOf(a) - TAGS.indexOf(b)));
+  }
+
+  /* resumo síncrono (função pura) de um registro:
+     { data, temRegistro, temTexto, caracteres, clima, tags:{tag:n}, total, periodosComClima, destaque:[tag], texto }
+     texto: "Dia chuvoso" · "Dia chuvoso e frio" · "Sem clima registrado" (há registro, sem clima) · "Sem registro" */
+  function resumirDia(reg) {
+    const r = normalizarRegistro(reg);
+    if (!r) {
+      return { data: null, temRegistro: false, temTexto: false, caracteres: 0, clima: { amanhecer: [], entardecer: [], noite: [] }, tags: {}, total: 0, periodosComClima: 0, destaque: [], texto: 'Sem registro' };
+    }
+    const tags = {}; let total = 0, periodos = 0;
+    PERIODOS.forEach((p) => { if (r.clima[p].length) periodos++; r.clima[p].forEach((t) => { tags[t] = (tags[t] || 0) + 1; total++; }); });
+    const destaque = destacarTags(tags);
+    return {
+      data: r.data, temRegistro: true, temTexto: r.texto.trim().length > 0, caracteres: r.texto.length, clima: r.clima,
+      tags, total, periodosComClima: periodos, destaque,
+      texto: destaque.length ? 'Dia ' + juntarTags(destaque) : 'Sem clima registrado',
+    };
+  }
+
+  window.TeurgicaData = { TAGS, PERIODOS, EXCLUSOES, resumirDia, carregarDia, listarPeriodo, listarLogs };
 
   /* ====================================================================
      ÍCONES (SVG 24×24, traço fino como o da lira)
@@ -119,6 +158,7 @@
   ];
   let construido = false, ativa = false, sub = null, timer = null;
   let hinarioPronto = false, diarioPronto = false;
+  let relPronto = false, relSujo = false;                /* Relatório (5.3): construído sob demanda; sujo = há dados novos */
   const el = {};            /* referências do DOM */
 
   function lerSessao() { try { const v = window.sessionStorage.getItem(CHAVE_ABA); return SUBS.some((s) => s.id === v) ? v : null; } catch (e) { return null; } }
@@ -151,7 +191,6 @@
       e.preventDefault();
       selecionar(SUBS[j].id, true);
     });
-    el.panel_relatorio.innerHTML = '<p class="teu-vazio">Em breve</p>';
     document.addEventListener('visibilitychange', ajustarRelogio);
   }
 
@@ -167,6 +206,7 @@
     if (foco) safe(() => el['tab_' + id].focus());
     if (id === 'hinario' && !hinarioPronto) { hinarioPronto = true; safe(montarHinario); }
     if (id === 'diario') safe(mostrarDiario);
+    if (id === 'relatorio') safe(mostrarRelatorio);
     ajustarRelogio();
   }
 
@@ -326,6 +366,7 @@
       if ((await S.put('diario', reg)) === null) throw new Error('put');
       await S.add('diario_log', { data, salvoEm: iso, hora: horaLocal(agora), horas: Math.round(horasDecimais(agora) * 1e5) / 1e5, acao: existente ? 'atualizou' : 'criou' });
       sujo = false;
+      relSujo = true;                                   /* o relatório se redesenha na próxima vez que for aberto */
       estado('Salvo às ' + horaLocal(agora), false);
       await atualizarSalvos();
     } catch (e) {
@@ -361,6 +402,7 @@
       const r = await S.importAll(texto);
       if (!r || !r.ok) { estadoCopia((r && r.erro) || 'Arquivo não reconhecido.', true); return; }
       const im = r.importados || {};
+      relSujo = true;
       estadoCopia('Cópia importada: ' + (im.diario || 0) + ' dia(s), ' + (im.diario_log || 0) + ' salvamento(s), ' + (im.festas || 0) + ' festa(s).' + (im.festas ? ' Recarregue a página para ver as festas.' : ''), false);
       if (!sujo) carregarNoForm(false); else atualizarSalvos();
     } catch (e) { estadoCopia('Não foi possível importar a cópia.', true); }
@@ -400,6 +442,377 @@
       el.teuData.max = hoje;
       if (seguirHoje && dataSel !== hoje && !sujo) { dataSel = hoje; el.teuData.value = hoje; carregarNoForm(false); }
     }
+  }
+
+  /* ====================================================================
+     5.3 RELATÓRIO — Semanal e Mensal
+     Sem timers: só redesenha ao navegar, ao trocar de tipo ou quando um diário foi salvo/importado.
+     Datas sempre CIVIS e LOCAIS (chave 'AAAA-MM-DD').
+     ==================================================================== */
+  /* true: hoje, ainda sem diário, já aparece em vermelho (o dia pode ser escrito até o fim); false: hoje fica neutro até salvar */
+  const HOJE_SEM_DIARIO_VERMELHO = true;
+  const ANO_MIN = 1900, ANO_MAX = 2200;
+  const COR_OK = '#7AC97A', COR_NO = '#E05555', COR_OURO = '#f3d08a';
+  const SEMANA_FALLBACK = [
+    { sym: '☉', name: 'Domingo' }, { sym: '☽', name: 'Segunda-feira' }, { sym: '♂', name: 'Terça-feira' }, { sym: '☿', name: 'Quarta-feira' },
+    { sym: '♃', name: 'Quinta-feira' }, { sym: '♀', name: 'Sexta-feira' }, { sym: '♄', name: 'Sábado' },
+  ];
+  const planetasDaSemana = () => safe(() => { const w = window.LiturgyKit && window.LiturgyKit.WEEK; return Array.isArray(w) && w.length === 7 ? w : null; }, null) || SEMANA_FALLBACK;
+  const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+  const mk = (tag, cls, txt) => { const n = document.createElement(tag); if (cls) n.className = cls; if (txt !== undefined) n.textContent = txt; return n; };
+  const domingoDe = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate() - d.getDay());
+  const somaDias = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+  const anoOk = (d) => d.getFullYear() >= ANO_MIN && d.getFullYear() <= ANO_MAX;
+  const dataDeStr = (s) => new Date(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10));
+  const ddmm = (s) => s.slice(8, 10) + '/' + s.slice(5, 7);
+  const hhmmss = (h) => {
+    const t = Math.floor((((h % 24) + 24) % 24) * 3600 + 1e-6) % 86400;
+    return pad(Math.floor(t / 3600)) + ':' + pad(Math.floor((t % 3600) / 60)) + ':' + pad(t % 60);
+  };
+
+  let relModo = 'semanal', relSemIni = null, relMes = null, relToken = 0, relFoco = null, relArmado = null, relToque = 0;
+  const relAbertos = new Set();                            /* dias (AAAA-MM-DD) abertos na visão semanal: sobrevive aos redesenhos */
+  const rel = {};                                          /* referências do DOM */
+
+  function rotuloSemana(ini) {
+    const fim = somaDias(ini, 6), a = ini.getDate(), b = fim.getDate();
+    if (ini.getMonth() === fim.getMonth()) return a + ' a ' + b + ' de ' + MESES[fim.getMonth()] + ' de ' + fim.getFullYear();
+    if (ini.getFullYear() === fim.getFullYear()) return a + ' de ' + MESES[ini.getMonth()] + ' a ' + b + ' de ' + MESES[fim.getMonth()] + ' de ' + fim.getFullYear();
+    return a + ' de ' + MESES[ini.getMonth()] + ' de ' + ini.getFullYear() + ' a ' + b + ' de ' + MESES[fim.getMonth()] + ' de ' + fim.getFullYear();
+  }
+
+  /* linha do log já validada (dados importados nunca chegam crus à tela) */
+  function linhaLog(l) {
+    let h = typeof l.horas === 'number' && isFinite(l.horas) && l.horas >= 0 && l.horas < 24 ? l.horas : null;
+    if (h === null && typeof l.salvoEm === 'string') { const d = new Date(l.salvoEm); if (!isNaN(d.getTime())) h = horasDecimais(d); }
+    const hora = typeof l.hora === 'string' && /^\d{2}:\d{2}:\d{2}$/.test(l.hora) ? l.hora : (h !== null ? hhmmss(h) : '—');
+    return { horas: h, hora, acao: l.acao === 'criou' || l.acao === 'atualizou' ? l.acao : '—' };
+  }
+  /* hora do ÚLTIMO salvamento do dia (log; senão o salvoEm do registro) */
+  function ultimoSalvamento(reg, logsDia) {
+    for (let i = logsDia.length - 1; i >= 0; i--) { const L = linhaLog(logsDia[i]); if (L.horas !== null) return L; }
+    if (reg && reg.salvoEm) { const d = new Date(reg.salvoEm); if (!isNaN(d.getTime())) { const h = horasDecimais(d); return { horas: h, hora: hhmmss(h), acao: '—' }; } }
+    return null;
+  }
+
+  /* informações de um dia, comuns à semana e ao mês */
+  function infoDia(s, reg, hojeS) {
+    const futuro = s > hojeS;
+    return { s, reg, tem: !!reg, futuro, hoje: s === hojeS, texto: reg ? resumirDia(reg).texto : (futuro ? 'Dia futuro' : 'Sem registro') };
+  }
+
+  /* ---------- visão semanal ---------- */
+  function montarDetalhe(det, s, reg, logsDia) {
+    if (det.querySelector('.teu-det, .teu-det-sem')) return;
+    if (!reg) { det.appendChild(mk('p', 'teu-det-sem', s > dataLocal() ? 'Este dia ainda não chegou.' : 'Sem registro neste dia.')); return; }
+    const box = mk('div', 'teu-det');
+    const esq = mk('div', 'teu-det-esq');
+    const ult = ultimoSalvamento(reg, logsDia);
+    if (ult && ult.horas !== null) {
+      const dial = mk('div', 'teu-dial teu-dial-rel');
+      const svg = safe(() => window.LiturgyKit.dialSVG(ult.horas, { id: 'teu-rel-' + s }), '');
+      if (svg) dial.innerHTML = svg; else dial.textContent = 'Mostrador indisponível';
+      esq.appendChild(dial);
+      esq.appendChild(mk('p', 'teu-det-hora', 'Anotado às ' + ult.hora));
+    } else esq.appendChild(mk('p', 'teu-det-hora', 'Hora do salvamento não registrada.'));
+    box.appendChild(esq);
+
+    const dir = mk('div', 'teu-det-dir');
+    dir.appendChild(mk('p', 'teu-det-texto' + (reg.texto ? '' : ' teu-det-sem-texto'), reg.texto ? reg.texto : 'Sem texto: só o clima foi registrado.'));
+    const clima = mk('div', 'teu-det-clima');
+    PERIODOS.forEach((p) => {
+      const gp = mk('div', 'teu-det-per'); gp.setAttribute('role', 'group'); gp.setAttribute('aria-label', PER_INFO[p].rotulo);
+      const sy = mk('span', 'teu-per-sym', PER_INFO[p].sym); sy.setAttribute('aria-hidden', 'true'); gp.appendChild(sy);
+      const chips = mk('span', 'teu-chips');
+      if (reg.clima[p].length) reg.clima[p].forEach((t) => chips.appendChild(mk('span', 'teu-tag', t)));
+      else chips.appendChild(mk('span', 'teu-nada', 'não registrado'));
+      gp.appendChild(chips); clima.appendChild(gp);
+    });
+    dir.appendChild(clima);
+    dir.appendChild(mk('h3', 'teu-det-h', 'Salvamentos'));
+    const ul = mk('ul', 'teu-det-log');
+    if (logsDia.length) {
+      logsDia.forEach((l) => {
+        const L = linhaLog(l), li = mk('li');
+        li.appendChild(mk('span', 'teu-salvo-h', L.hora)); li.appendChild(document.createTextNode(' ')); li.appendChild(mk('span', 'teu-salvo-a', L.acao));
+        ul.appendChild(li);
+      });
+    } else ul.appendChild(mk('li', 'teu-salvo-vazio', 'Nenhum salvamento registrado.'));
+    dir.appendChild(ul);
+    box.appendChild(dir);
+    det.appendChild(box);
+  }
+
+  function montarSemana(corpo, ini, mapa, logsPorDia) {
+    const hojeS = dataLocal(), plan = planetasDaSemana();
+    const ul = mk('ul', 'teu-sem-lista');
+    for (let i = 0; i < 7; i++) {
+      const s = dataLocal(somaDias(ini, i)), reg = mapa[s] || null, inf = infoDia(s, reg, hojeS), logsDia = logsPorDia[s] || [];
+      const li = mk('li');
+      const det = mk('details', 'teu-dia' + (inf.hoje ? ' teu-hoje' : '')); det.setAttribute('data-data', s);
+      const sm = mk('summary', 'teu-dia-h');
+      const chev = mk('span', 'teu-chev'); chev.setAttribute('aria-hidden', 'true'); sm.appendChild(chev);
+      const pl = mk('span', 'teu-planeta', plan[i].sym); pl.setAttribute('aria-hidden', 'true'); sm.appendChild(pl);
+      sm.appendChild(mk('span', 'ou-sr', plan[i].name + ', '));
+      sm.appendChild(mk('span', 'teu-sem-data', ddmm(s) + (inf.hoje ? ' · hoje' : '')));
+      sm.appendChild(mk('span', 'teu-sem-res', inf.texto));
+      if (inf.tem) sm.appendChild(mk('span', 'teu-marca teu-marca-ok', '✓ diário'));
+      else if (!inf.futuro) sm.appendChild(mk('span', 'teu-marca teu-marca-no', 'sem diário'));
+      det.appendChild(sm);
+      det.addEventListener('toggle', () => {                       /* o conteúdo do dia só entra no DOM ao abrir */
+        if (det.open) { relAbertos.add(s); montarDetalhe(det, s, reg, logsDia); } else relAbertos.delete(s);
+      });
+      if (relAbertos.has(s)) { det.open = true; montarDetalhe(det, s, reg, logsDia); }
+      li.appendChild(det); ul.appendChild(li);
+    }
+    corpo.appendChild(ul);
+  }
+
+  /* ---------- visão mensal ---------- */
+  const pol = (r, a) => { const t = a * Math.PI / 180; return [500 + r * Math.sin(t), 500 - r * Math.cos(t)]; };
+  const n2 = (x) => +x.toFixed(2);
+  function setor(r1, r2, a1, a2) {
+    const g = (a2 - a1) > 180 ? 1 : 0;
+    const [x1, y1] = pol(r2, a1), [x2, y2] = pol(r2, a2), [x3, y3] = pol(r1, a2), [x4, y4] = pol(r1, a1);
+    return 'M' + n2(x1) + ' ' + n2(y1) + 'A' + r2 + ' ' + r2 + ' 0 ' + g + ' 1 ' + n2(x2) + ' ' + n2(y2) + 'L' + n2(x3) + ' ' + n2(y3) + 'A' + r1 + ' ' + r1 + ' 0 ' + g + ' 0 ' + n2(x4) + ' ' + n2(y4) + 'Z';
+  }
+  /* disco lunar: mesma técnica de ouranos.js (disco escuro + parte iluminada; espelhado quando a elongação passa de 180°) */
+  function discoLua(x, y, R, elong) {
+    const cE = Math.cos(elong * Math.PI / 180), rx = (R * Math.abs(cE)).toFixed(2);
+    return '<g transform="translate(' + n2(x) + ' ' + n2(y) + ')' + (elong > 180 ? ' scale(-1 1)' : '') + '" aria-hidden="true">' +
+      '<circle r="' + R + '" fill="#141a26" stroke="rgba(159,176,200,.6)"/>' +
+      '<path d="M0 ' + (-R) + 'A' + R + ' ' + R + ' 0 0 1 0 ' + R + 'A' + rx + ' ' + R + ' 0 0 ' + (cE > 0 ? 0 : 1) + ' 0 ' + (-R) + 'Z" fill="#F0EBD8"/></g>';
+  }
+  /* Período do mês exibido: mês LUNAR do Calendário Litúrgico (LiturgyKit.lunarMonth); sem o kit, cai no mês civil.
+     ref = {k} (lunar) ou {y, m} (civil). Os dias são sempre chaves civis 'AAAA-MM-DD'. */
+  function mesDe(ref) {
+    const K = window.LiturgyKit;
+    if (ref && ref.k !== undefined && K && typeof K.lunarMonthK === 'function') {
+      const lm = safe(() => K.lunarMonthK(ref.k), null);
+      if (lm && lm.dates && lm.dates.length) {
+        const ini = lm.dates[0], fim = lm.dates[lm.dates.length - 1];
+        return { ref: { k: lm.k }, lunar: true, dias: lm.dates, nome: lm.name, romano: lm.roman, ini, fim,
+          intervalo: ddmm(ini) + ' a ' + ddmm(fim) + '/' + fim.slice(0, 4),
+          titulo: 'Mês ' + lm.roman + ' · ' + lm.name };
+      }
+    }
+    const y = ref.y, m = ref.m, n = new Date(y, m + 1, 0).getDate(), dias = [];
+    for (let d = 1; d <= n; d++) dias.push(y + '-' + pad(m + 1) + '-' + pad(d));
+    return { ref: { y, m }, lunar: false, dias, nome: cap(MESES[m]), romano: '', ini: dias[0], fim: dias[n - 1], intervalo: String(y), titulo: cap(MESES[m]) + ' de ' + y };
+  }
+  function refDeData(s) {
+    const K = window.LiturgyKit, lm = K && typeof K.lunarMonth === 'function' ? safe(() => K.lunarMonth(s), null) : null;
+    if (lm && lm.dates && lm.dates.length) return { k: lm.k };
+    const d = dataDeStr(s); return { y: d.getFullYear(), m: d.getMonth() };
+  }
+  function refVizinha(ref, dir) {
+    if (ref.k !== undefined) return { k: ref.k + dir };
+    const d = new Date(ref.y, ref.m + dir, 1); return { y: d.getFullYear(), m: d.getMonth() };
+  }
+  function estadoMes(inf) {
+    if (inf.tem) return 'ok';
+    if (inf.futuro) return 'neutro';
+    if (inf.hoje && !HOJE_SEM_DIARIO_VERMELHO) return 'neutro';
+    return 'no';
+  }
+
+  function montarMes(corpo, mi, mapa) {
+    const n = mi.dias.length, hojeS = dataLocal(), step = 360 / n;
+    const K = window.LiturgyKit, temLua = !!(K && typeof K.moonInfo === 'function');
+    const R1 = 250, R2 = 440, R_NUM = 305, R_LUA = 386, R_CHK = 268;
+    const dias = []; let feitos = 0, passados = 0, idxTab = 0;
+    for (let d = 1; d <= n; d++) {
+      const s = mi.dias[d - 1], inf = infoDia(s, mapa[s] || null, hojeS);
+      inf.dia = d;
+      inf.lua = temLua ? safe(() => K.moonInfo(dataDeStr(s).setHours(12)), null) : null;
+      if (!inf.futuro) { passados++; if (inf.tem) feitos++; }
+      if (inf.hoje) idxTab = d - 1;
+      dias.push(inf);
+    }
+    const contagem = passados === 0 ? 'Mês ainda não começou' : feitos + ' de ' + passados + (passados === 1 ? ' dia registrado' : ' dias registrados');
+    const titulo = mi.titulo + ' (' + mi.intervalo + ')';
+
+    let g = '<circle cx="500" cy="500" r="' + (R2 + 6) + '" fill="none" stroke="rgba(201,164,92,0.15)" stroke-width="1"/>';
+    dias.forEach((inf, i) => {
+      const a1 = i * step, a2 = (i + 1) * step, mid = a1 + step / 2, st = estadoMes(inf);
+      const info = 'Dia ' + inf.dia + (mi.lunar ? ' (' + ddmm(inf.s) + ')' : '') + ' · ' + inf.texto;
+      const rotulo = 'Dia ' + inf.dia + (mi.lunar ? ' (' + ddmm(inf.s) + ')' : '') + (inf.lua ? ', ' + inf.lua.phaseName : '') + '. ' + inf.texto + '.' + (inf.tem ? ' Diário feito.' : '') + (inf.hoje ? ' Hoje.' : '');
+      g += '<g class="teu-mes-dia" data-dia="' + inf.dia + '" data-data="' + inf.s + '" data-info="' + esc(info) + '" role="button" tabindex="' + (i === idxTab ? 0 : -1) + '" aria-label="' + esc(rotulo) + '">';
+      g += '<path class="teu-seg" d="' + setor(R1, R2, a1, a2) + '" fill="' + (i % 2 ? 'rgba(255,255,255,0.012)' : 'rgba(255,255,255,0.035)') + '" stroke="rgba(201,164,92,0.28)" stroke-width="1"/>';
+      if (st === 'ok') g += '<path class="teu-st-ok" d="' + setor(R1 + 5, R2 - 5, a1 + 0.8, a2 - 0.8) + '" fill="none" stroke="' + COR_OK + '" stroke-width="3.5" stroke-linejoin="round"/>';
+      else if (st === 'no') g += '<path class="teu-st-no" d="' + setor(R1 + 5, R2 - 5, a1 + 0.8, a2 - 0.8) + '" fill="none" stroke="' + COR_NO + '" stroke-width="3" stroke-dasharray="9 6" stroke-linejoin="round"/>';
+      if (inf.lua) { const [lx, ly] = pol(R_LUA, mid); g += discoLua(lx, ly, 26, inf.lua.elong); }
+      const [nx, ny] = pol(R_NUM, mid);
+      g += '<text class="teu-mes-num" x="' + n2(nx) + '" y="' + n2(ny) + '" text-anchor="middle" dominant-baseline="central" font-size="24" font-weight="' + (inf.hoje ? 700 : 400) + '" fill="' + (inf.hoje ? COR_OURO : '#efe6d2') + '" style="font-family:\'Jost\',sans-serif">' + inf.dia + '</text>';
+      if (inf.tem) { const [cx, cy] = pol(R_CHK, mid); g += '<text class="teu-mes-chk" x="' + n2(cx) + '" y="' + n2(cy) + '" text-anchor="middle" dominant-baseline="central" font-size="22" font-weight="700" fill="' + COR_OK + '">✓</text>'; }
+      if (inf.hoje) {
+        const [p1x, p1y] = pol(R2 + 8, mid), [p2x, p2y] = pol(R2 + 28, mid - 2), [p3x, p3y] = pol(R2 + 28, mid + 2);
+        g += '<path class="teu-mes-hoje" d="M' + n2(p1x) + ' ' + n2(p1y) + 'L' + n2(p2x) + ' ' + n2(p2y) + 'L' + n2(p3x) + ' ' + n2(p3y) + 'Z" fill="' + COR_OURO + '"/>';
+      }
+      g += '</g>';
+    });
+    const partes = mi.lunar ? mi.nome.split(' da ') : [mi.nome];
+    const linhas = mi.lunar
+      ? [['Mês ' + mi.romano, 28, 410, '#8197aa', 'Cinzel'], [partes[0] + (partes[1] ? ' da' : ''), 46, 462, COR_OURO, 'Cormorant Garamond'], [partes[1] || '', 46, 514, COR_OURO, 'Cormorant Garamond'], [mi.intervalo, 24, 566, '#efe6d2', 'Jost'], [contagem, 22, 610, '#8197aa', 'Jost']]
+      : [[mi.nome, 54, 452, COR_OURO, 'Cormorant Garamond'], [mi.ref.y, 38, 514, '#efe6d2', 'Cinzel'], [contagem, 22, 574, '#8197aa', 'Jost']];
+    g += '<g class="teu-mes-centro" aria-hidden="true">' + linhas.filter((l) => l[0] !== '').map((l, i, a) =>
+      '<text' + (l[0] === contagem ? ' class="teu-mes-cont"' : '') + ' x="500" y="' + l[2] + '" text-anchor="middle" font-size="' + l[1] + '" fill="' + l[3] + '" style="font-family:\'' + l[4] + '\',serif;font-weight:500">' + esc(String(l[0])) + '</text>').join('') + '</g>';
+
+    const box = mk('div', 'teu-mes');
+    box.appendChild(mk('p', 'ou-sr', titulo + ': ' + contagem + '. Use as setas para percorrer os dias e Enter para abrir o dia na visão semanal.'));
+    box.insertAdjacentHTML('beforeend',
+      '<svg class="teu-mes-svg" viewBox="0 0 1000 1000" xmlns="http://www.w3.org/2000/svg" role="group" focusable="false" aria-label="' + esc('Círculo de ' + titulo + ': um segmento por dia, com a fase da lua') + '">' + g + '</svg>' +
+      '<ul class="teu-leg" aria-label="Legenda">' +
+        '<li class="teu-leg-ok"><i aria-hidden="true">✓</i> diário feito (contorno verde)</li>' +
+        '<li class="teu-leg-no"><i aria-hidden="true"></i> sem diário (contorno vermelho tracejado)</li>' +
+        '<li class="teu-leg-hoje"><i aria-hidden="true">▾</i> hoje (marcador dourado)</li>' +
+      '</ul>');
+    corpo.appendChild(box);
+  }
+
+  /* ---------- controles, renderização e navegação ---------- */
+  const INFO_PADRAO_MES = 'Passe o mouse, toque ou use as setas sobre um dia para ver o resumo.';
+  function mostrarInfo(t) {
+    if (!rel.info) return;
+    const v = t == null ? (relModo === 'mensal' ? INFO_PADRAO_MES : '') : t;
+    if (rel.info.textContent !== v) rel.info.textContent = v;
+  }
+  function atualizarControles() {
+    const sem = relModo === 'semanal';
+    rel.modos.forEach((b) => b.setAttribute('aria-pressed', b.dataset.modo === relModo ? 'true' : 'false'));
+    const ant = sem ? 'Semana anterior' : 'Mês anterior', prox = sem ? 'Próxima semana' : 'Próximo mês';
+    rel.prev.setAttribute('aria-label', ant); rel.prev.title = ant;
+    rel.next.setAttribute('aria-label', prox); rel.next.title = prox;
+    rel.hoje.textContent = sem ? 'Esta semana' : 'Este mês';
+    rel.info.hidden = sem;
+  }
+
+  async function renderRelatorio() {
+    const meu = ++relToken; relSujo = false;
+    atualizarControles();
+    const sem = relModo === 'semanal';
+    const mi = sem ? null : mesDe(relMes);
+    if (!sem) relMes = mi.ref;
+    const sDe = sem ? dataLocal(relSemIni) : mi.ini, sAte = sem ? dataLocal(somaDias(relSemIni, 6)) : mi.fim;
+    const [regs, logs] = await Promise.all([listarPeriodo(sDe, sAte), sem ? listarLogs(sDe, sAte) : Promise.resolve([])]);
+    if (meu !== relToken) return;                              /* uma navegação mais nova já assumiu */
+    const mapa = {}; regs.forEach((r) => { mapa[r.data] = r; });
+    rel.aviso.hidden = !!store();
+    rel.corpo.textContent = '';
+    relArmado = null;
+    if (sem) {
+      rel.tit.textContent = rotuloSemana(relSemIni);
+      const porDia = {}; logs.forEach((l) => { (porDia[l.data] || (porDia[l.data] = [])).push(l); });
+      montarSemana(rel.corpo, relSemIni, mapa, porDia);
+    } else {
+      rel.tit.textContent = mi.lunar ? mi.titulo + ' · ' + mi.intervalo : mi.titulo;
+      montarMes(rel.corpo, mi, mapa);
+    }
+    mostrarInfo(null);
+    if (relFoco) {
+      const s = relFoco; relFoco = null;
+      const sm = rel.corpo.querySelector('details.teu-dia[data-data="' + s + '"] summary');
+      if (sm) { safe(() => sm.focus()); safe(() => sm.scrollIntoView({ block: 'nearest' })); }
+    }
+  }
+
+  function navegar(dir) {
+    if (relModo === 'semanal') {
+      const novo = somaDias(relSemIni, 7 * dir);
+      if (!anoOk(novo) || !anoOk(somaDias(novo, 6))) return;
+      relSemIni = novo;
+    } else {
+      const novo = mesDe(refVizinha(relMes, dir));
+      if (!anoOk(dataDeStr(novo.ini)) || !anoOk(dataDeStr(novo.fim))) return;
+      relMes = novo.ref;
+    }
+    renderRelatorio();
+  }
+  function irHoje() {
+    const h = new Date();
+    relSemIni = domingoDe(h); relMes = refDeData(dataLocal(h));
+    renderRelatorio();
+  }
+  function trocarModo(modo) {
+    if (modo === relModo || (modo !== 'semanal' && modo !== 'mensal')) return;
+    if (modo === 'mensal') relMes = refDeData(dataLocal(somaDias(relSemIni, 3)));
+    else {
+      const mi = mesDe(relMes), hs = dataLocal();
+      relSemIni = domingoDe(dataDeStr(mi.dias.indexOf(hs) >= 0 ? hs : mi.ini));
+    }
+    relModo = modo;
+    renderRelatorio();
+  }
+  /* do círculo do mês para o detalhe do dia na visão semanal */
+  function abrirDia(s) {
+    if (!dataValida(s)) return;
+    relModo = 'semanal'; relSemIni = domingoDe(dataDeStr(s)); relAbertos.add(s); relFoco = s;
+    renderRelatorio();
+  }
+
+  function montarRelatorio() {
+    const h = new Date();
+    relSemIni = domingoDe(h); relMes = refDeData(dataLocal(h)); relModo = 'semanal';
+    el.panel_relatorio.innerHTML =
+      '<div class="teu-rel">' +
+        '<div class="teu-rel-modos" role="group" aria-label="Tipo de relatório">' +
+          '<button type="button" class="teu-btn teu-modo" data-modo="semanal" aria-pressed="true">Semanal</button>' +
+          '<button type="button" class="teu-btn teu-modo" data-modo="mensal" aria-pressed="false">Mensal</button>' +
+        '</div>' +
+        '<div class="teu-rel-nav" role="group" aria-label="Período">' +
+          '<button type="button" class="teu-btn teu-nav" id="teuRelPrev"><span aria-hidden="true">‹</span></button>' +
+          '<h2 class="teu-rel-tit" id="teuRelTit" aria-live="polite" aria-atomic="true"></h2>' +
+          '<button type="button" class="teu-btn teu-nav" id="teuRelNext"><span aria-hidden="true">›</span></button>' +
+          '<button type="button" class="teu-btn teu-btn-disc" id="teuRelHoje"></button>' +
+        '</div>' +
+        '<p class="teu-estado teu-erro" id="teuRelAviso" hidden>⚠ Armazenamento indisponível neste navegador: o relatório aparece vazio.</p>' +
+        '<div class="teu-rel-corpo" id="teuRelCorpo"></div>' +
+        '<p class="teu-rel-info" id="teuRelInfo" aria-live="polite" aria-atomic="true" hidden></p>' +
+      '</div>';
+    rel.modos = Array.prototype.slice.call(el.panel_relatorio.querySelectorAll('.teu-modo'));
+    ['teuRelPrev', 'teuRelNext', 'teuRelHoje', 'teuRelTit', 'teuRelAviso', 'teuRelCorpo', 'teuRelInfo'].forEach((id) => { rel[id.slice(6).toLowerCase()] = document.getElementById(id); });
+    /* nomes em rel: prev, next, hoje, tit, aviso, corpo, info */
+
+    rel.modos.forEach((b) => b.addEventListener('click', () => trocarModo(b.dataset.modo)));
+    rel.prev.addEventListener('click', () => navegar(-1));
+    rel.next.addEventListener('click', () => navegar(1));
+    rel.hoje.addEventListener('click', irHoje);
+
+    /* círculo do mês: hover / toque / foco mostram o resumo; clique ou Enter abrem o dia */
+    const alvo = (e) => (e.target && e.target.closest ? e.target.closest('.teu-mes-dia') : null);
+    rel.corpo.addEventListener('mouseover', (e) => { const t = alvo(e); if (t && Date.now() - relToque > 800) relArmado = null; if (t) mostrarInfo(t.getAttribute('data-info')); });
+    rel.corpo.addEventListener('mouseleave', () => { if (!relArmado) mostrarInfo(null); });   /* no toque o resumo fica até o próximo toque */
+    rel.corpo.addEventListener('focusin', (e) => { const t = alvo(e); if (t) mostrarInfo(t.getAttribute('data-info')); });
+    rel.corpo.addEventListener('focusout', (e) => { if (!relArmado && alvo(e) && !(e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest('.teu-mes-dia'))) mostrarInfo(null); });
+    rel.corpo.addEventListener('touchstart', (e) => { relToque = Date.now(); const t = alvo(e); if (t) mostrarInfo(t.getAttribute('data-info')); }, { passive: true });
+    rel.corpo.addEventListener('click', (e) => {
+      const t = alvo(e); if (!t) return;
+      const s = t.getAttribute('data-data');
+      const toque = e.pointerType === 'touch' || (Date.now() - relToque < 800);
+      if (toque && relArmado !== s) {                          /* no toque: o 1º toque mostra o resumo, o 2º abre o dia */
+        relArmado = s; mostrarInfo(t.getAttribute('data-info') + ' — toque de novo para abrir'); return;
+      }
+      relArmado = null; abrirDia(s);
+    });
+    rel.corpo.addEventListener('keydown', (e) => {
+      const t = alvo(e); if (!t) return;
+      const dias = Array.prototype.slice.call(rel.corpo.querySelectorAll('.teu-mes-dia')), i = dias.indexOf(t), n = dias.length;
+      let j;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') j = (i + 1) % n;
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') j = (i - 1 + n) % n;
+      else if (e.key === 'Home') j = 0;
+      else if (e.key === 'End') j = n - 1;
+      else if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') { e.preventDefault(); abrirDia(t.getAttribute('data-data')); return; }
+      else return;
+      e.preventDefault();
+      dias.forEach((d) => d.setAttribute('tabindex', '-1'));
+      dias[j].setAttribute('tabindex', '0'); safe(() => dias[j].focus());
+    });
+  }
+
+  function mostrarRelatorio() {
+    if (!relPronto) { relPronto = true; montarRelatorio(); renderRelatorio(); }
+    else if (relSujo) renderRelatorio();
   }
 
   /* ====================================================================

@@ -403,5 +403,21 @@ function moonInfo(date) {
   const phaseIndex = Math.floor(frac * 8 + 0.5) % 8;
   return { age, frac, elong: frac * 360, phaseName: PHASES[phaseIndex], phaseIndex };
 }
-window.LiturgyKit = { dialSVG, moonInfo, civilOfLitDay, WEEK, PHASES, litDay };
+/* Mês lunar do Calendário Litúrgico (começa no dia litúrgico seguinte à Lua Nova; nome e número como no relógio) */
+function lunarMonthK(k) {
+  const startDay = monthStartDay(k), next = monthStartDay(k + 1), month = (((k + 1) % 12) + 12) % 12;
+  const dates = [];
+  for (let L = startDay; L < next; L++) dates.push(civilOfLitDay(L));
+  return { k, month, name: monthName(month), roman: ROMAN[month], days: next - startDay, startDay, dates, start: dates[0], end: dates[dates.length - 1] };
+}
+function lunarMonth(x) {
+  const ms = x instanceof Date ? x.getTime() : (typeof x === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x) ? new Date(+x.slice(0, 4), +x.slice(5, 7) - 1, +x.slice(8, 10), 12).getTime() : Number(x));
+  if (!isFinite(ms)) return null;
+  const L = litDay(ms);
+  let k = Math.floor((ms / DAY_MS + 2440587.5 - 2451550.09765) / 29.530588853);
+  while (monthStartDay(k + 1) <= L) k++;
+  while (monthStartDay(k) > L) k--;
+  return lunarMonthK(k);
+}
+window.LiturgyKit = { dialSVG, moonInfo, civilOfLitDay, WEEK, PHASES, litDay, lunarMonth, lunarMonthK };
 })();

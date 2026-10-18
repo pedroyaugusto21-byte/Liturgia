@@ -262,3 +262,91 @@ dialog#festaDialog::backdrop { background: rgba(5, 8, 16, .75); }
   #teurgicaView .teu-tab { padding: 0 8px; gap: 5px; font-size: 10px; letter-spacing: .05em; min-width: 0; }
   #teurgicaView .teu-tab svg { width: 18px; height: 18px; }
 }
+
+/* ======================================================================
+   ABA 5.3 — RELATÓRIO (semanal e mensal)
+   ====================================================================== */
+#teurgicaView .teu-rel { max-width: 780px; margin: 0 auto; }
+#teurgicaView .teu-rel-modos { display: flex; justify-content: center; gap: 8px; margin-bottom: 18px; }
+#teurgicaView .teu-modo {
+  min-height: 40px; padding: 0 24px; border-radius: 999px; text-transform: uppercase; letter-spacing: .14em; font-size: 12px;
+}
+/* selecionado: preenchimento + negrito + barra inferior (não depende só da cor; aria-pressed para leitor de tela) */
+#teurgicaView .teu-modo[aria-pressed="true"] {
+  background: rgba(201, 164, 92, .2); border-color: var(--teu-gold-hi); color: var(--teu-gold-hi); font-weight: 700;
+  box-shadow: inset 0 -3px 0 var(--teu-gold-hi);
+}
+#teurgicaView .teu-rel-nav { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
+#teurgicaView .teu-nav { flex: 0 0 auto; width: 40px; min-width: 40px; padding: 0; border-radius: 50%; font-size: 22px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; }
+#teurgicaView .teu-rel-tit {
+  flex: 1 1 220px; min-width: 0; text-align: center; font-family: 'Cinzel', serif; font-size: 15px; font-weight: 500;
+  letter-spacing: .06em; color: var(--teu-gold); overflow-wrap: anywhere;
+}
+#teurgicaView .teu-rel-aviso, #teurgicaView #teuRelAviso { margin-bottom: 14px; text-align: center; }
+#teurgicaView .teu-rel-info { min-height: 1.6em; margin-top: 14px; text-align: center; font-size: 15px; line-height: 1.5; color: var(--teu-text); overflow-wrap: anywhere; }
+
+/* ---------- semanal: 7 dias recolhíveis ---------- */
+#teurgicaView .teu-sem-lista { list-style: none; display: grid; gap: 10px; }
+#teurgicaView .teu-dia { border: 1px solid rgba(201, 164, 92, .22); border-radius: 12px; background: rgba(201, 164, 92, .04); }
+#teurgicaView .teu-dia[open] { background: rgba(201, 164, 92, .07); }
+#teurgicaView .teu-dia.teu-hoje { border-color: rgba(243, 208, 138, .7); }
+#teurgicaView .teu-dia-h {
+  display: flex; align-items: center; flex-wrap: wrap; gap: .3rem .9rem; min-height: 44px; padding: 8px 16px;
+  cursor: pointer; list-style: none; border-radius: 12px;
+}
+#teurgicaView .teu-dia-h::-webkit-details-marker { display: none; }
+#teurgicaView .teu-dia-h:hover .teu-sem-res { text-decoration: underline; text-decoration-color: var(--teu-gold); text-underline-offset: 4px; }
+#teurgicaView .teu-dia[open] .teu-chev::before { content: '\25BE'; }
+#teurgicaView .teu-planeta {
+  flex: 0 0 28px; text-align: center; font-family: 'Noto Sans Symbols', 'Noto Sans Symbols 2', serif; font-size: 24px; line-height: 1; color: var(--teu-gold-hi);
+}
+#teurgicaView .teu-sem-data { flex: 0 0 auto; font-family: ui-monospace, monospace; font-size: 13px; color: var(--teu-muted); }
+#teurgicaView .teu-sem-res { flex: 1 1 150px; min-width: 0; font-family: 'Cormorant Garamond', serif; font-size: 20px; font-weight: 600; color: var(--teu-text); overflow-wrap: anywhere; }
+#teurgicaView .teu-marca { flex: 0 0 auto; font-size: 12px; letter-spacing: .06em; white-space: nowrap; }
+#teurgicaView .teu-marca-ok { color: var(--teu-green); font-weight: 700; }
+#teurgicaView .teu-marca-no { color: #E0816A; }
+
+/* detalhe do dia */
+#teurgicaView .teu-det { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 22px; align-items: start; padding: 4px 18px 20px; }
+#teurgicaView .teu-det-sem { padding: 2px 18px 18px 18px; font-size: 14px; color: var(--teu-muted); }
+#teurgicaView .teu-det-esq { display: flex; flex-direction: column; align-items: center; gap: 8px; min-width: 0; }
+#teurgicaView .teu-dial-rel { width: 150px; }
+#teurgicaView .teu-det-hora { font-size: 13px; line-height: 1.4; text-align: center; color: var(--teu-muted); }
+#teurgicaView .teu-det-dir { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+#teurgicaView .teu-det-texto { white-space: pre-line; overflow-wrap: anywhere; font-family: 'Cormorant Garamond', serif; font-size: 19px; line-height: 1.55; color: var(--teu-text); }
+#teurgicaView .teu-det-sem-texto { font-family: 'Jost', system-ui, sans-serif; font-size: 14px; font-style: italic; color: var(--teu-muted); }
+#teurgicaView .teu-det-clima { display: flex; flex-direction: column; border: 1px solid rgba(201, 164, 92, .2); border-radius: 10px; padding: 2px 12px; }
+#teurgicaView .teu-det-per { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
+#teurgicaView .teu-det-per + .teu-det-per { border-top: 1px solid rgba(201, 164, 92, .14); }
+#teurgicaView .teu-tag { display: inline-flex; align-items: center; min-height: 26px; padding: 0 11px; border-radius: 999px; border: 1px solid rgba(201, 164, 92, .4); font-size: 13px; color: var(--teu-text); }
+#teurgicaView .teu-nada { font-size: 13px; font-style: italic; color: var(--teu-muted); }
+#teurgicaView .teu-det-h { font-size: 11px; font-weight: 600; letter-spacing: .18em; text-transform: uppercase; color: var(--teu-gold); }
+#teurgicaView .teu-det-log { list-style: none; display: flex; flex-wrap: wrap; gap: 4px 18px; margin-top: -8px; }
+#teurgicaView .teu-det-log li { font-size: 14px; color: var(--teu-text); }
+
+/* ---------- mensal: círculo com as fases da lua ---------- */
+#teurgicaView .teu-mes { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+#teurgicaView .teu-mes-svg { width: 100%; max-width: 640px; height: auto; display: block; user-select: none; -webkit-tap-highlight-color: transparent; }
+#teurgicaView .teu-mes-dia { cursor: pointer; }
+#teurgicaView .teu-mes-dia:hover .teu-seg { fill: rgba(201, 164, 92, .14); }
+#teurgicaView .teu-mes-dia:focus-visible .teu-seg { fill: rgba(201, 164, 92, .22); stroke: var(--teu-gold-hi); stroke-width: 3; }
+#teurgicaView .teu-leg { list-style: none; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 22px; font-size: 13px; color: var(--teu-muted); }
+#teurgicaView .teu-leg li { display: inline-flex; align-items: center; gap: 8px; }
+#teurgicaView .teu-leg i {
+  display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 18px; border-radius: 4px;
+  font-style: normal; font-size: 12px; font-weight: 700; line-height: 1;
+}
+#teurgicaView .teu-leg-ok i { border: 3px solid var(--teu-green); color: var(--teu-green); }
+#teurgicaView .teu-leg-no i { border: 3px dashed var(--teu-red); }
+#teurgicaView .teu-leg-hoje i { color: var(--teu-gold-hi); font-size: 16px; }
+
+@media (max-width: 720px) {
+  #teurgicaView .teu-det { grid-template-columns: minmax(0, 1fr); }
+  #teurgicaView .teu-det-esq { flex-direction: row; justify-content: center; gap: 14px; }
+  #teurgicaView .teu-dial-rel { width: 120px; }
+}
+@media (max-width: 560px) {
+  #teurgicaView .teu-dia-h { padding: 8px 12px; gap: .25rem .6rem; }
+  #teurgicaView .teu-sem-res { font-size: 18px; }
+  #teurgicaView .teu-det { padding: 4px 12px 16px; }
+}
