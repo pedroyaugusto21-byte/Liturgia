@@ -265,6 +265,8 @@
         '<div class="teu-diario-esq">' +
           '<label class="teu-lab" for="teuTexto">Como foi o seu dia?</label>' +
           '<textarea id="teuTexto" maxlength="' + TEXTO_MAX + '" rows="12"></textarea>' +
+          '<button type="button" class="teu-phi" id="teuPhi" aria-expanded="false" aria-controls="teuVersos" aria-label="Versos Áureos de Pitágoras" title="Versos Áureos de Pitágoras"><span aria-hidden="true">Φ</span></button>' +
+          '<section class="teu-versos" id="teuVersos" aria-labelledby="teuVersosH" hidden><h2 class="teu-versos-h" id="teuVersosH">Versos Áureos de Pitágoras</h2><ol class="teu-versos-lista" id="teuVersosLista"></ol></section>' +
           '<div class="teu-acoes"><button type="button" class="teu-btn teu-btn-ok" id="teuSalvar">Salvar</button>' +
           '<p class="teu-estado" id="teuEstado" aria-live="polite" aria-atomic="true"></p></div>' +
         '</div>' +
@@ -277,16 +279,30 @@
         '<input type="file" id="teuArquivo" accept="application/json,.json" hidden>' +
         '<p class="teu-estado" id="teuCopiaEstado" aria-live="polite" aria-atomic="true"></p>' +
       '</div>';
-    ['teuDial', 'teuHora', 'teuDataExt', 'teuData', 'teuTexto', 'teuSalvar', 'teuEstado', 'teuSalvos', 'teuExportar', 'teuImportar', 'teuArquivo', 'teuCopiaEstado']
+    ['teuPhi', 'teuVersos', 'teuVersosLista', 'teuDial', 'teuHora', 'teuDataExt', 'teuData', 'teuTexto', 'teuSalvar', 'teuEstado', 'teuSalvos', 'teuExportar', 'teuImportar', 'teuArquivo', 'teuCopiaEstado']
       .forEach((id) => { el[id] = document.getElementById(id); });
 
     el.teuTexto.addEventListener('input', () => { sujo = true; });
+    el.teuPhi.addEventListener('click', alternarVersos);
     el.panel_diario.querySelectorAll('.teu-chip').forEach((b) => b.addEventListener('click', () => alternarChip(b)));
     el.teuSalvar.addEventListener('click', salvar);
     el.teuData.addEventListener('change', trocarData);
     el.teuExportar.addEventListener('click', exportar);
     el.teuImportar.addEventListener('click', () => el.teuArquivo.click());
     el.teuArquivo.addEventListener('change', importar);
+  }
+
+  /* Φ: mostra/oculta os Versos Áureos (texto entra no DOM só na primeira abertura) */
+  function alternarVersos() {
+    const abrir = el.teuVersos.hidden;
+    if (abrir && !el.teuVersosLista.childNodes.length) {
+      const dados = safe(() => (typeof VERSOS_AUREOS !== 'undefined' ? VERSOS_AUREOS : null), null);
+      const lista = Array.isArray(dados) ? dados.filter((v) => typeof v === 'string' && v.length) : [];
+      if (!lista.length) { const p = document.createElement('p'); p.className = 'teu-vazio'; p.textContent = 'Versos indisponíveis'; el.teuVersosLista.appendChild(p); }
+      else lista.forEach((v) => { const li = document.createElement('li'); li.textContent = v; el.teuVersosLista.appendChild(li); });
+    }
+    el.teuVersos.hidden = !abrir;
+    el.teuPhi.setAttribute('aria-expanded', abrir ? 'true' : 'false');
   }
 
   const confirmar = (msg) => safe(() => window.confirm(msg) === true, false);

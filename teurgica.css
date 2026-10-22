@@ -220,6 +220,20 @@ dialog#festaDialog::backdrop { background: rgba(5, 8, 16, .75); }
 #teurgicaView .teu-btn-disc { min-height: 36px; padding: 0 14px; font-size: 12px; border-color: rgba(129, 151, 170, .45); color: var(--teu-muted); }
 #teurgicaView .teu-btn-disc:hover { color: var(--teu-gold); border-color: var(--teu-gold); }
 
+/* Φ e Versos Áureos */
+#teurgicaView .teu-phi {
+  align-self: center; width: 44px; height: 44px; border-radius: 50%; cursor: pointer;
+  border: 1px solid rgba(201, 164, 92, .5); background: transparent; color: var(--teu-gold);
+  font-family: 'Cormorant Garamond', serif; font-size: 26px; line-height: 1; font-weight: 600;
+}
+#teurgicaView .teu-phi:hover { background: rgba(201, 164, 92, .14); }
+#teurgicaView .teu-phi[aria-expanded="true"] { background: rgba(201, 164, 92, .2); border-color: var(--teu-gold-hi); color: var(--teu-gold-hi); box-shadow: inset 0 -3px 0 var(--teu-gold-hi); }
+#teurgicaView .teu-versos { border: 1px solid rgba(201, 164, 92, .25); border-radius: 12px; background: rgba(201, 164, 92, .04); padding: 16px 18px; }
+#teurgicaView .teu-versos-h { text-align: center; font-family: 'Cormorant Garamond', serif; font-size: 22px; font-weight: 600; color: var(--teu-gold-hi); margin-bottom: 12px; }
+#teurgicaView .teu-versos-lista { padding-left: 2.2em; display: grid; gap: 10px; }
+#teurgicaView .teu-versos-lista li { font-family: 'Cormorant Garamond', serif; font-size: 18px; line-height: 1.5; color: var(--teu-text); overflow-wrap: anywhere; }
+#teurgicaView .teu-versos-lista li::marker { color: var(--teu-gold); font-size: .8em; }
+
 /* Clima */
 #teurgicaView .teu-clima { border: 1px solid rgba(201, 164, 92, .25); border-radius: 12px; background: rgba(201, 164, 92, .04); padding: 14px 16px 16px; }
 #teurgicaView .teu-clima-h { font-family: 'Cinzel', serif; font-size: 14px; font-weight: 500; letter-spacing: .14em; text-transform: uppercase; color: var(--teu-gold); margin-bottom: 10px; }
