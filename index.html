@@ -5,12 +5,19 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Calendarium — Calendários</title>
 <meta name="description" content="Ciclo Sagrado — o tempo litúrgico, lunar e uraniano em três calendários circulares.">
+<link rel="icon" type="image/png" sizes="48x48" href="favicon-48.png">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
+<link rel="shortcut icon" href="favicon.ico">
+<link rel="apple-touch-icon" sizes="180x180" href="icone-lira-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icone-lira-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@300;400;500;600&family=Jost:wght@300;400;500&family=Noto+Sans+Symbols&family=Noto+Sans+Symbols+2&family=Raleway:wght@300;400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="astral.css">
 <link rel="stylesheet" href="calendarium.css">
 <link rel="stylesheet" href="teurgica.css">
+<link rel="stylesheet" href="mansoes.css">
 </head>
 <body>
 
@@ -167,6 +174,11 @@
           <div class="note-title">A Lua Nova — Noumênia</div>
           <p>A Lua nova, ou Noumênia, marca o início de um Mês Litúrgico, bem como o ritual de limpeza e re-consagração, purificação e comunhão de um Lar; neste rito celebram-se Héstia ( ⚻ ), Agathos-Daimon ( 🜍 ), Hécate ( Ⱛ ) e todos os deuses da devoção pessoal do órfico.</p>
         </div>
+        <section class="mansoes" id="lunarMansoes" aria-labelledby="lunarMansoesH">
+          <h2 id="lunarMansoesH">Mansões Lunares</h2>
+          <p class="mans-lede">A Lua percorre o zodíaco em 28 casas de cerca de 12°51′ cada, uma por dia. Passe o mouse (ou toque) em um dia da roda para ver a mansão daquele dia.</p>
+          <div class="mans-host"></div>
+        </section>
         <div class="footer">Ciclo lunar · 29,53 dias · Cálculo astronômico</div>
       </div>
     </div>
@@ -213,6 +225,11 @@
       <div id="ou-astral-panel">
         <div class="ou-row"><button class="ou-btn" id="ou-loc-btn"><span aria-hidden="true">📍</span> Atualizar localização</button></div>
         <div class="ou-astral-grid" id="ou-astral-grid"></div>
+        <section class="mansoes" id="astralMansoes" aria-labelledby="astralMansoesH">
+          <h2 id="astralMansoesH">Mansões Lunares</h2>
+          <p class="mans-lede">A mansão ocupada pela Lua no instante do mapa. Acompanha o controle do tempo: ao avançar ou recuar o céu, a mansão muda junto.</p>
+          <div class="mans-host"></div>
+        </section>
       </div>
       <div class="ou-legend" id="ou-legend"></div>
       <details class="ou-catalog" id="ou-catalog" open>
@@ -234,6 +251,7 @@
 <script src="store.js"></script>
 <script src="festas.js"></script>
 <script src="liturgy.js"></script>
+<script src="mansoes-lunares.js"></script>
 <script src="lunar.js"></script>
 <script src="ouranos.js"></script>
 <script src="hinos-orficos.js"></script>

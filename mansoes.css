@@ -1,0 +1,63 @@
+/* ======================================================================
+   MANSÕES LUNARES — estilo da seção (abas Lunar e Mapa Astral)
+   Cores herdadas de cada aba: dourado lunar na Lunar, variáveis --ou-* no Urano.
+   ====================================================================== */
+.mansoes {
+  --mg: #C9A84C; --mt: rgba(240,240,255,.78); --mm: rgba(168,184,200,.62);
+  --mb: rgba(201,168,76,.2); --mc: rgba(201,168,76,.05); --mok: #8fbf9a; --mno: #d08a7a;
+  width: 100%; margin-top: 22px; padding-top: 20px; border-top: 1px solid var(--mb); color: var(--mt);
+}
+#ouranosView .mansoes {
+  --mg: var(--ou-gold); --mt: var(--ou-text); --mm: var(--ou-muted);
+  --mb: var(--ou-border); --mc: rgba(255,255,255,.02); margin-top: 1.5rem; padding-top: 1.1rem;
+}
+.mansoes h2 { font-family: 'Cinzel', serif; font-size: 12px; font-weight: 600; letter-spacing: 2.5px; text-transform: uppercase; text-align: center; color: var(--mg); margin-bottom: 8px; }
+#ouranosView .mansoes h2 { font-family: 'Space Grotesk', sans-serif; font-size: .78rem; letter-spacing: .14em; }
+.mansoes .mans-lede { font-size: 11px; line-height: 1.65; color: var(--mm); text-align: center; max-width: 520px; margin: 0 auto 14px; }
+
+.mans-now { border: 1px solid var(--mb); border-left: 3px solid var(--mg); border-radius: 12px; background: var(--mc); padding: 14px 16px 16px; }
+.mans-kicker { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--mm); margin-bottom: 10px; }
+.mans-head { display: flex; align-items: center; gap: 12px; }
+.mans-num { flex: none; width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--mg); color: var(--mg); display: flex; align-items: center; justify-content: center; font-family: 'Cinzel', serif; font-size: 15px; font-weight: 600; }
+.mans-head h3 { font-family: 'Cinzel', serif; font-size: 15px; font-weight: 600; color: var(--mg); letter-spacing: 1px; line-height: 1.3; }
+.mans-ar { display: block; font-size: 18px; line-height: 1.5; color: var(--mt); }
+.mans-epi { margin: 8px 0 10px; font-size: 13px; font-style: italic; color: var(--mt); }
+.mans-pic { font-style: normal; font-size: 11px; color: var(--mm); }
+.mans-bar { height: 4px; border-radius: 2px; background: rgba(168,184,200,.18); overflow: hidden; margin-bottom: 8px; }
+.mans-bar i { display: block; height: 100%; background: var(--mg); border-radius: 2px; }
+.mans-meta { font-size: 11px; line-height: 1.6; color: var(--mm); }
+.mans-text { margin: 12px 0; font-size: 12.5px; line-height: 1.7; color: var(--mt); }
+.mans-rows { display: flex; flex-direction: column; gap: 8px; font-size: 11px; }
+.mans-rows > div { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
+.mans-rows b { flex: none; min-width: 92px; font-weight: 600; letter-spacing: .5px; text-transform: uppercase; font-size: 9.5px; color: var(--mm); }
+.mans-rows > div > span { display: flex; flex-wrap: wrap; gap: 4px; color: var(--mt); }
+.mans-tag { padding: 2px 8px; border-radius: 999px; border: 1px solid var(--mb); font-size: 10.5px; line-height: 1.5; overflow-wrap: anywhere; }
+.mans-tag.ok { color: var(--mok); border-color: rgba(143,191,154,.4); background: rgba(143,191,154,.08); }
+.mans-tag.no { color: var(--mno); border-color: rgba(208,138,122,.4); background: rgba(208,138,122,.08); }
+.mans-none { color: var(--mm); }
+
+.mans-all { margin-top: 14px; }
+.mans-all > summary { cursor: pointer; list-style: none; text-align: center; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--mg); padding: 8px; border: 1px solid var(--mb); border-radius: 10px; }
+.mans-all > summary::-webkit-details-marker { display: none; }
+.mans-all > summary::after { content: ' ＋'; }
+.mans-all[open] > summary::after { content: ' −'; }
+.mans-all > summary:focus-visible, .mans-item > summary:focus-visible { outline: 2px solid var(--mg); outline-offset: 2px; }
+.mans-ol { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.mans-item { border: 1px solid var(--mb); border-radius: 10px; background: var(--mc); }
+.mans-item.cur { border-color: var(--mg); box-shadow: 0 0 0 1px var(--mg) inset; }
+.mans-item > summary { cursor: pointer; list-style: none; display: grid; grid-template-columns: 28px 1fr; gap: 0 10px; padding: 8px 12px; align-items: baseline; }
+.mans-item > summary::-webkit-details-marker { display: none; }
+.mans-item .n { grid-row: 1 / span 3; font-family: 'Cinzel', serif; font-size: 13px; color: var(--mg); text-align: right; }
+.mans-item .nm { font-size: 12.5px; font-weight: 500; color: var(--mt); }
+.mans-item .nm em { font-style: normal; color: var(--mg); font-size: 10.5px; }
+.mans-item .ep { font-size: 11px; font-style: italic; color: var(--mm); }
+.mans-item .pos { font-size: 10px; color: var(--mm); }
+.mans-body { padding: 0 12px 12px 50px; }
+.mans-body .mans-ar { font-size: 16px; }
+.mans-body .mans-pic { font-size: 11px; margin-top: 2px; }
+.mans-body .mans-text { margin: 8px 0; }
+@media (max-width: 480px) {
+  .mans-rows b { min-width: 0; flex-basis: 100%; }
+  .mans-body { padding-left: 12px; }
+}
+.mans-head .mans-ar { text-align: left; }

@@ -137,3 +137,7 @@
   #ouranosView .ou-astro-pos { font-size: .66rem; overflow-wrap: anywhere; }
   #ouranosView table.ou-tab { min-width: 440px; }
 }
+
+/* ---------- mostrador da hora planetária ---------- */
+#ouranosView .ou-hdial { display: flex; justify-content: center; }
+#ouranosView .ou-hdial svg { width: 100%; max-width: 300px; height: auto; display: block; }

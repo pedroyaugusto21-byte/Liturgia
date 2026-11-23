@@ -111,6 +111,8 @@ function draw() {
   }
   const displayDay = hovered || (isNow ? today.getDate() : 1);
   const displayAge = lunarAge(new Date(y, m, displayDay));
+  /* Mansões Lunares: mostra a mansão do dia em foco (hoje, ou o dia sob o mouse/toque) */
+  if (window.MansoesLunares) { try { MansoesLunares.setLunar(isNow && !hovered ? new Date() : new Date(y, m, displayDay, 12), isNow && !hovered); } catch (e) { /* ignora */ } }
   drawMoon(CX, CY, R_MOON, displayAge);
   const words = phaseName(displayAge).split(' ');
   ctx.font = `400 ${SIZE * 0.026}px Cinzel, sans-serif`;

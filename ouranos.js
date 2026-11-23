@@ -447,6 +447,7 @@ function renderAstral(force){
     astralKey=key;
     host.innerHTML=buildAstralSVG(A);
     document.getElementById('ou-astral-grid').innerHTML=buildAstralCards(A);
+    if(window.MansoesLunares){try{MansoesLunares.setAstral(A.date,A.bodies[0].lon);}catch(e){}}
     astralInfoText=`✦ Mapa astral · ${fmtH(A.civilH)} (hora solar ${fmtH(A.solarH)}) · ☉ ${zText(A.sunLon)}`;
   }
   if(!astralHover&&infoBar.textContent!==astralInfoText)infoBar.textContent=astralInfoText;

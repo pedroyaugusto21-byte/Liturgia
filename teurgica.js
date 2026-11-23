@@ -58,6 +58,7 @@
       id: typeof r.id === 'string' ? r.id.slice(0, 64) : '',
       texto: typeof r.texto === 'string' ? r.texto.slice(0, TEXTO_MAX) : '',
       clima,
+      photagogia: r.photagogia === true,
       criadoEm: typeof r.criadoEm === 'string' ? r.criadoEm : '',
       salvoEm: typeof r.salvoEm === 'string' ? r.salvoEm : '',
     };
@@ -268,6 +269,7 @@
           '<button type="button" class="teu-phi" id="teuPhi" aria-expanded="false" aria-controls="teuVersos" aria-label="Versos Áureos de Pitágoras" title="Versos Áureos de Pitágoras"><span aria-hidden="true">Φ</span></button>' +
           '<section class="teu-versos" id="teuVersos" aria-labelledby="teuVersosH" hidden><h2 class="teu-versos-h" id="teuVersosH">Versos Áureos de Pitágoras</h2><ol class="teu-versos-lista" id="teuVersosLista"></ol></section>' +
           '<div class="teu-acoes"><button type="button" class="teu-btn teu-btn-ok" id="teuSalvar">Salvar</button>' +
+          '<button type="button" class="teu-btn teu-btn-phot" id="teuPhot" aria-pressed="false">Photagogia</button>' +
           '<p class="teu-estado" id="teuEstado" aria-live="polite" aria-atomic="true"></p></div>' +
         '</div>' +
         '<div class="teu-clima" role="group" aria-labelledby="teuClimaTit"><h2 class="teu-clima-h" id="teuClimaTit">Clima</h2>' + grupos + '</div>' +
@@ -279,17 +281,25 @@
         '<input type="file" id="teuArquivo" accept="application/json,.json" hidden>' +
         '<p class="teu-estado" id="teuCopiaEstado" aria-live="polite" aria-atomic="true"></p>' +
       '</div>';
-    ['teuPhi', 'teuVersos', 'teuVersosLista', 'teuDial', 'teuHora', 'teuDataExt', 'teuData', 'teuTexto', 'teuSalvar', 'teuEstado', 'teuSalvos', 'teuExportar', 'teuImportar', 'teuArquivo', 'teuCopiaEstado']
+    ['teuPhi', 'teuVersos', 'teuVersosLista', 'teuDial', 'teuHora', 'teuDataExt', 'teuData', 'teuTexto', 'teuSalvar', 'teuPhot', 'teuEstado', 'teuSalvos', 'teuExportar', 'teuImportar', 'teuArquivo', 'teuCopiaEstado']
       .forEach((id) => { el[id] = document.getElementById(id); });
 
     el.teuTexto.addEventListener('input', () => { sujo = true; });
     el.teuPhi.addEventListener('click', alternarVersos);
     el.panel_diario.querySelectorAll('.teu-chip').forEach((b) => b.addEventListener('click', () => alternarChip(b)));
     el.teuSalvar.addEventListener('click', salvar);
+    el.teuPhot.addEventListener('click', () => { definirPhot(el.teuPhot.getAttribute('aria-pressed') !== 'true'); sujo = true; });
     el.teuData.addEventListener('change', trocarData);
     el.teuExportar.addEventListener('click', exportar);
     el.teuImportar.addEventListener('click', () => el.teuArquivo.click());
     el.teuArquivo.addEventListener('change', importar);
+  }
+
+  /* Photagogia: começa desativada; ativa, marca o dia como "Feito" (gravado junto com o Salvar).
+     Dia que termina sem ela ativa aparece como "Não-feito" no relatório, sem nenhuma ação. */
+  function definirPhot(on) {
+    el.teuPhot.setAttribute('aria-pressed', on ? 'true' : 'false');
+    el.teuPhot.textContent = on ? 'Photagogia · Feito' : 'Photagogia';
   }
 
   /* Φ: mostra/oculta os Versos Áureos (texto entra no DOM só na primeira abertura) */
@@ -349,6 +359,7 @@
     if (meu !== tokenCarga) return;
     el.teuTexto.value = r ? r.texto : '';
     aplicarClima(r ? r.clima : null);
+    definirPhot(!!(r && r.photagogia));
     sujo = false;
     await atualizarSalvos();
     if (meu !== tokenCarga) return;
@@ -370,7 +381,8 @@
     if (ocupado) return;
     const texto = el.teuTexto.value.slice(0, TEXTO_MAX).trim();
     const clima = lerClima();
-    if (!texto && !PERIODOS.some((p) => clima[p].length)) { estado('Escreva algo ou marque o clima antes de salvar.', true); el.teuTexto.focus(); return; }
+    const phot = el.teuPhot.getAttribute('aria-pressed') === 'true';
+    if (!texto && !phot && !PERIODOS.some((p) => clima[p].length)) { estado('Escreva algo, marque o clima ou a Photagogia antes de salvar.', true); el.teuTexto.focus(); return; }
     const S = store();
     if (!S) { estado('Armazenamento indisponível neste navegador.', true); return; }
     ocupado = true;
@@ -378,7 +390,7 @@
       const data = dataSel;
       const existente = await carregarDia(data);
       const agora = new Date(), iso = agora.toISOString();
-      const reg = { data, id: (existente && existente.id) || novoId(), texto, clima, criadoEm: (existente && existente.criadoEm) || iso, salvoEm: iso };
+      const reg = { data, id: (existente && existente.id) || novoId(), texto, clima, photagogia: phot, criadoEm: (existente && existente.criadoEm) || iso, salvoEm: iso };
       if ((await S.put('diario', reg)) === null) throw new Error('put');
       await S.add('diario_log', { data, salvoEm: iso, hora: horaLocal(agora), horas: Math.round(horasDecimais(agora) * 1e5) / 1e5, acao: existente ? 'atualizou' : 'criou' });
       sujo = false;
@@ -514,13 +526,16 @@
   /* informações de um dia, comuns à semana e ao mês */
   function infoDia(s, reg, hojeS) {
     const futuro = s > hojeS;
-    return { s, reg, tem: !!reg, futuro, hoje: s === hojeS, texto: reg ? resumirDia(reg).texto : (futuro ? 'Dia futuro' : 'Sem registro') };
+    const phot = reg && reg.photagogia ? 'feito' : futuro ? 'futuro' : s === hojeS ? 'aberto' : 'nao';   /* 'nao': o dia virou sem a Photagogia */
+    return { s, reg, tem: !!reg, phot, futuro, hoje: s === hojeS, texto: reg ? resumirDia(reg).texto : (futuro ? 'Dia futuro' : 'Sem registro') };
   }
+
+  const PHOT_ROTULO = { feito: 'Feito', nao: 'Não-feito', aberto: 'em aberto' };
 
   /* ---------- visão semanal ---------- */
   function montarDetalhe(det, s, reg, logsDia) {
     if (det.querySelector('.teu-det, .teu-det-sem')) return;
-    if (!reg) { det.appendChild(mk('p', 'teu-det-sem', s > dataLocal() ? 'Este dia ainda não chegou.' : 'Sem registro neste dia.')); return; }
+    if (!reg) { det.appendChild(mk('p', 'teu-det-sem', s > dataLocal() ? 'Este dia ainda não chegou.' : 'Sem registro neste dia.' + (s < dataLocal() ? ' Photagogia: Não-feito.' : ''))); return; }
     const box = mk('div', 'teu-det');
     const esq = mk('div', 'teu-det-esq');
     const ult = ultimoSalvamento(reg, logsDia);
@@ -534,7 +549,9 @@
     box.appendChild(esq);
 
     const dir = mk('div', 'teu-det-dir');
-    dir.appendChild(mk('p', 'teu-det-texto' + (reg.texto ? '' : ' teu-det-sem-texto'), reg.texto ? reg.texto : 'Sem texto: só o clima foi registrado.'));
+    dir.appendChild(mk('p', 'teu-det-texto' + (reg.texto ? '' : ' teu-det-sem-texto'), reg.texto ? reg.texto : (PERIODOS.some((p) => reg.clima[p].length) ? 'Sem texto: só o clima foi registrado.' : 'Sem texto nem clima: só a Photagogia foi registrada.')));
+    const fs = reg.photagogia ? 'feito' : (s < dataLocal() ? 'nao' : 'aberto');
+    dir.appendChild(mk('p', 'teu-det-phot teu-det-phot-' + fs, 'Photagogia: ' + PHOT_ROTULO[fs]));
     const clima = mk('div', 'teu-det-clima');
     PERIODOS.forEach((p) => {
       const gp = mk('div', 'teu-det-per'); gp.setAttribute('role', 'group'); gp.setAttribute('aria-label', PER_INFO[p].rotulo);
@@ -574,6 +591,7 @@
       sm.appendChild(mk('span', 'teu-sem-res', inf.texto));
       if (inf.tem) sm.appendChild(mk('span', 'teu-marca teu-marca-ok', '✓ diário'));
       else if (!inf.futuro) sm.appendChild(mk('span', 'teu-marca teu-marca-no', 'sem diário'));
+      if (inf.phot !== 'futuro') sm.appendChild(mk('span', 'teu-marca teu-marca-phot' + (inf.phot === 'feito' ? ' teu-marca-ok' : inf.phot === 'nao' ? ' teu-marca-no' : ''), 'Photagogia · ' + PHOT_ROTULO[inf.phot]));
       det.appendChild(sm);
       det.addEventListener('toggle', () => {                       /* o conteúdo do dia só entra no DOM ao abrir */
         if (det.open) { relAbertos.add(s); montarDetalhe(det, s, reg, logsDia); } else relAbertos.delete(s);
@@ -635,7 +653,7 @@
   function montarMes(corpo, mi, mapa) {
     const n = mi.dias.length, hojeS = dataLocal(), step = 360 / n;
     const K = window.LiturgyKit, temLua = !!(K && typeof K.moonInfo === 'function');
-    const R1 = 250, R2 = 440, R_NUM = 305, R_LUA = 386, R_CHK = 268;
+    const R1 = 250, R2 = 440, R_NUM = 305, R_LUA = 386, R_CHK = 268, R_PH = 338;
     const dias = []; let feitos = 0, passados = 0, idxTab = 0;
     for (let d = 1; d <= n; d++) {
       const s = mi.dias[d - 1], inf = infoDia(s, mapa[s] || null, hojeS);
@@ -651,8 +669,8 @@
     let g = '<circle cx="500" cy="500" r="' + (R2 + 6) + '" fill="none" stroke="rgba(201,164,92,0.15)" stroke-width="1"/>';
     dias.forEach((inf, i) => {
       const a1 = i * step, a2 = (i + 1) * step, mid = a1 + step / 2, st = estadoMes(inf);
-      const info = 'Dia ' + inf.dia + (mi.lunar ? ' (' + ddmm(inf.s) + ')' : '') + ' · ' + inf.texto;
-      const rotulo = 'Dia ' + inf.dia + (mi.lunar ? ' (' + ddmm(inf.s) + ')' : '') + (inf.lua ? ', ' + inf.lua.phaseName : '') + '. ' + inf.texto + '.' + (inf.tem ? ' Diário feito.' : '') + (inf.hoje ? ' Hoje.' : '');
+      const info = 'Dia ' + inf.dia + (mi.lunar ? ' (' + ddmm(inf.s) + ')' : '') + ' · ' + inf.texto + (inf.phot === 'futuro' ? '' : ' · Photagogia: ' + PHOT_ROTULO[inf.phot]);
+      const rotulo = 'Dia ' + inf.dia + (mi.lunar ? ' (' + ddmm(inf.s) + ')' : '') + (inf.lua ? ', ' + inf.lua.phaseName : '') + '. ' + inf.texto + '.' + (inf.tem ? ' Diário feito.' : '') + (inf.phot === 'feito' ? ' Photagogia feita.' : inf.phot === 'nao' ? ' Photagogia não feita.' : '') + (inf.hoje ? ' Hoje.' : '');
       g += '<g class="teu-mes-dia" data-dia="' + inf.dia + '" data-data="' + inf.s + '" data-info="' + esc(info) + '" role="button" tabindex="' + (i === idxTab ? 0 : -1) + '" aria-label="' + esc(rotulo) + '">';
       g += '<path class="teu-seg" d="' + setor(R1, R2, a1, a2) + '" fill="' + (i % 2 ? 'rgba(255,255,255,0.012)' : 'rgba(255,255,255,0.035)') + '" stroke="rgba(201,164,92,0.28)" stroke-width="1"/>';
       if (st === 'ok') g += '<path class="teu-st-ok" d="' + setor(R1 + 5, R2 - 5, a1 + 0.8, a2 - 0.8) + '" fill="none" stroke="' + COR_OK + '" stroke-width="3.5" stroke-linejoin="round"/>';
@@ -660,6 +678,8 @@
       if (inf.lua) { const [lx, ly] = pol(R_LUA, mid); g += discoLua(lx, ly, 26, inf.lua.elong); }
       const [nx, ny] = pol(R_NUM, mid);
       g += '<text class="teu-mes-num" x="' + n2(nx) + '" y="' + n2(ny) + '" text-anchor="middle" dominant-baseline="central" font-size="24" font-weight="' + (inf.hoje ? 700 : 400) + '" fill="' + (inf.hoje ? COR_OURO : '#efe6d2') + '" style="font-family:\'Jost\',sans-serif">' + inf.dia + '</text>';
+      if (inf.phot === 'feito') { const [px, py] = pol(R_PH, mid); g += '<circle class="teu-ph-ok" cx="' + n2(px) + '" cy="' + n2(py) + '" r="9" fill="' + COR_OK + '"/>'; }
+      else if (inf.phot === 'nao') { const [px, py] = pol(R_PH, mid); g += '<text class="teu-ph-no" x="' + n2(px) + '" y="' + n2(py) + '" text-anchor="middle" dominant-baseline="central" font-size="22" font-weight="700" fill="' + COR_NO + '">✕</text>'; }
       if (inf.tem) { const [cx, cy] = pol(R_CHK, mid); g += '<text class="teu-mes-chk" x="' + n2(cx) + '" y="' + n2(cy) + '" text-anchor="middle" dominant-baseline="central" font-size="22" font-weight="700" fill="' + COR_OK + '">✓</text>'; }
       if (inf.hoje) {
         const [p1x, p1y] = pol(R2 + 8, mid), [p2x, p2y] = pol(R2 + 28, mid - 2), [p3x, p3y] = pol(R2 + 28, mid + 2);
@@ -681,6 +701,8 @@
       '<ul class="teu-leg" aria-label="Legenda">' +
         '<li class="teu-leg-ok"><i aria-hidden="true">✓</i> diário feito (contorno verde)</li>' +
         '<li class="teu-leg-no"><i aria-hidden="true"></i> sem diário (contorno vermelho tracejado)</li>' +
+        '<li class="teu-leg-phok"><i aria-hidden="true"></i> Photagogia feita</li>' +
+        '<li class="teu-leg-phno"><i aria-hidden="true">✕</i> Photagogia não feita (o dia já virou)</li>' +
         '<li class="teu-leg-hoje"><i aria-hidden="true">▾</i> hoje (marcador dourado)</li>' +
       '</ul>');
     corpo.appendChild(box);

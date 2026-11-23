@@ -364,3 +364,14 @@ dialog#festaDialog::backdrop { background: rgba(5, 8, 16, .75); }
   #teurgicaView .teu-sem-res { font-size: 18px; }
   #teurgicaView .teu-det { padding: 4px 12px 16px; }
 }
+
+/* ---------- Photagogia ---------- */
+#teurgicaView .teu-btn-phot { border-color: rgba(129, 151, 170, .5); color: var(--teu-muted); }
+#teurgicaView .teu-btn-phot:hover { color: var(--teu-gold); border-color: var(--teu-gold); }
+#teurgicaView .teu-btn-phot[aria-pressed="true"] { background: rgba(122, 201, 122, .16); border-color: var(--teu-green); color: var(--teu-green); font-weight: 600; }
+#teurgicaView .teu-marca-phot:not(.teu-marca-ok):not(.teu-marca-no) { color: var(--teu-muted); }
+#teurgicaView .teu-det-phot { margin: .6rem 0 0; font-size: 14px; color: var(--teu-muted); }
+#teurgicaView .teu-det-phot-feito { color: var(--teu-green); font-weight: 600; }
+#teurgicaView .teu-det-phot-nao { color: #E0816A; }
+#teurgicaView .teu-leg-phok i { width: 18px; height: 18px; border-radius: 50%; background: var(--teu-green); }
+#teurgicaView .teu-leg-phno i { color: var(--teu-red); font-size: 16px; }

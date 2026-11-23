@@ -574,7 +574,7 @@
   }
   function tag(t, warn, cls) { return '<span class="ou-astro-tag' + (warn ? ' warn' : '') + (cls ? ' ' + cls : '') + '">' + t + '</span>'; }
   function card(key, col, sym, name, tags, pos, rows) {
-    var open = userOpen[key] === undefined ? key === relKey : userOpen[key];
+    var open = userOpen[key] === undefined ? (key === relKey || key === 'hora') : userOpen[key];  /* o mostrador da hora planetária já vem aberto */
     return '<details class="ou-astro" data-k="' + key + '"' + (open ? ' open' : '') + ' style="border-left-color:' + col + '">' +
       '<summary class="ou-astro-h"><span class="ou-chev" aria-hidden="true"></span>' +
       (sym ? '<span class="ou-astro-sym" style="color:' + col + '" aria-hidden="true">' + sym + SYMF + '</span>' : '') +
@@ -650,6 +650,57 @@
     ];
     return card('fortuna', '#E2C36B', '⊗', 'Parte da Fortuna', tags, lonTxt(lon), rows);
   }
+  /* ================= mostrador da hora planetária =================
+     24 horas na borda (12 do dia, em dourado, e 12 da noite, em azul), cada uma com o símbolo do seu
+     regente e o número da hora. O nascer do Sol fica à esquerda, o meio-dia no topo e o pôr do Sol à
+     direita (a mesma convenção do mapa). A hora vigente é realçada e, no centro, ficam o regente
+     (símbolo grande), o número da hora, o nome do regente e o intervalo em hora civil. */
+  function hourDial(M) {
+    var H = M.hour, A = M.A;
+    if (!H || H.polar) return '';
+    var cx = 150, cy = 150, f = function (v) { return v.toFixed(1); };
+    var P = function (r, a) { var t = a * D2R; return [cx + r * Math.sin(t), cy - r * Math.cos(t)]; };
+    var SYM = "font-family:'Noto Sans Symbols','Noto Sans Symbols 2','Segoe UI Symbol',serif";
+    var UI = "font-family:'Inter',system-ui,sans-serif";
+    var R0 = 98, R1 = 140;
+    function seg(a1, a2) {
+      var p1 = P(R1, a1), p2 = P(R1, a2), p3 = P(R0, a2), p4 = P(R0, a1);
+      return 'M' + f(p1[0]) + ' ' + f(p1[1]) + 'A' + R1 + ' ' + R1 + ' 0 0 1 ' + f(p2[0]) + ' ' + f(p2[1]) +
+        'L' + f(p3[0]) + ' ' + f(p3[1]) + 'A' + R0 + ' ' + R0 + ' 0 0 0 ' + f(p4[0]) + ' ' + f(p4[1]) + 'Z';
+    }
+    var base = CHALD.indexOf(H.dayRuler), g = '', n;
+    for (n = 0; n < 24; n++) {
+      var a1 = 270 + 15 * n, a2 = a1 + 15, mid = a1 + 7.5, on = n === H.n, day = n < 12;
+      var rul = ASTROS[CHALD[(base + n) % 7]];
+      var fill = on ? 'rgba(243,208,138,.38)' : day ? 'rgba(243,208,138,.08)' : 'rgba(110,140,215,.10)';
+      var stroke = on ? '#f3d08a' : 'rgba(201,168,76,.28)';
+      var sp = P(121, mid), np = P(104, mid);
+      g += '<path d="' + seg(a1, a2) + '" fill="' + fill + '" stroke="' + stroke + '" stroke-width="' + (on ? 1.6 : .7) + '"/>' +
+        '<text x="' + f(sp[0]) + '" y="' + f(sp[1]) + '" text-anchor="middle" dominant-baseline="central" font-size="' + (on ? 17 : 14) +
+        '" fill="' + (on ? '#f3d08a' : day ? '#d9c27c' : '#9fb4e6') + '" style="' + SYM + '">' + rul.s + SYMF + '</text>' +
+        '<text x="' + f(np[0]) + '" y="' + f(np[1]) + '" text-anchor="middle" dominant-baseline="central" font-size="7.5" fill="' +
+        (on ? '#f3d08a' : '#8197aa') + '" style="' + UI + '">' + ((n % 12) + 1) + '</text>';
+    }
+    /* ponteiro: posição dentro da hora vigente, arredondada a 0,5° para não redesenhar a cada segundo */
+    var fr = ((((A.solarH - H.start) % 24) + 24) % 24) / H.len;
+    fr = Math.max(0, Math.min(1, fr));
+    var ang = Math.round((270 + 15 * (H.n + fr)) * 2) / 2, t1 = P(R0 - 3, ang), t2 = P(R1 + 6, ang);
+    g += '<line x1="' + f(t1[0]) + '" y1="' + f(t1[1]) + '" x2="' + f(t2[0]) + '" y2="' + f(t2[1]) + '" stroke="#f3d08a" stroke-width="2" stroke-linecap="round"/>' +
+      '<circle cx="' + f(t2[0]) + '" cy="' + f(t2[1]) + '" r="3" fill="#f3d08a"/>';
+    /* nascer, meio-dia e pôr do Sol */
+    g += '<text x="' + f(P(R1 + 7, 270)[0]) + '" y="' + f(P(R1 + 7, 270)[1]) + '" text-anchor="middle" dominant-baseline="central" font-size="9" fill="#8197aa" style="' + SYM + '">☉' + SYMF + '</text>';
+    /* centro */
+    var rul = ASTROS[H.ruler], c = H.isDay ? '#f3d08a' : '#9fb4e6';
+    g += '<circle cx="' + cx + '" cy="' + cy + '" r="92" fill="rgba(6,9,14,.75)" stroke="rgba(201,168,76,.3)"/>' +
+      '<text x="' + cx + '" y="108" text-anchor="middle" dominant-baseline="central" font-size="40" fill="' + c + '" style="' + SYM + '">' + rul.s + SYMF + '</text>' +
+      '<text x="' + cx + '" y="140" text-anchor="middle" font-size="12" font-weight="600" fill="#e6eefb" style="' + UI + '">' + ((H.n % 12) + 1) + 'ª hora ' + (H.isDay ? 'do dia' : 'da noite') + '</text>' +
+      '<text x="' + cx + '" y="158" text-anchor="middle" font-size="11" fill="' + c + '" style="' + UI + '">regente ' + rul.n + '</text>' +
+      '<text x="' + cx + '" y="177" text-anchor="middle" font-size="10" fill="#8197aa" style="' + UI + '">' + hh(H.start + A.off) + ' – ' + hh(H.end + A.off) + '</text>' +
+      '<text x="' + cx + '" y="195" text-anchor="middle" font-size="9.5" fill="#8197aa" style="' + UI + '">' + WDAY[H.wd] + ' · ' + ASTROS[H.dayRuler].s + SYMF + '</text>';
+    var lbl = 'Mostrador das horas planetárias: ' + ((H.n % 12) + 1) + 'ª hora ' + (H.isDay ? 'do dia' : 'da noite') + ', regida por ' + rul.n +
+      ', das ' + hh(H.start + A.off) + ' às ' + hh(H.end + A.off) + '.';
+    return '<div class="ou-hdial"><svg viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="' + esc(lbl) + '" focusable="false">' + g + '</svg></div>';
+  }
   function hourCard(M) {
     var H = M.hour, A = M.A;
     if (!H) return card('hora', '#F3D08A', '', 'Hora planetária', [], '', [['Hora', '<span class="ou-empty">Indisponível: sem nascer e pôr do Sol calculados para este local.</span>']]);
@@ -658,6 +709,7 @@
     var tags = [tag(H.isDay ? 'Hora diurna' : 'Hora noturna')];
     if (!M.known) tags.push(tag('Aproximada (sem latitude)', true));
     var rows = [
+      ['Mostrador', hourDial(M)],
       ['Dia', WDAY[H.wd] + ' · regente ' + NM(H.dayRuler)],
       ['Hora', '<b>' + ((H.n % 12) + 1) + 'ª hora ' + (H.isDay ? 'do dia' : 'da noite') + '</b> <span class="ou-empty">(' + (H.n + 1) + 'ª desde o nascer do Sol)</span> · regente <b>' + NM(H.ruler) + '</b>'],
       ['Intervalo', hh(H.start + A.off) + ' – ' + hh(H.end + A.off) + ' <span class="ou-empty">(hora civil · duração ' + dd(H.len * 60, 0) + ' min)</span>']
