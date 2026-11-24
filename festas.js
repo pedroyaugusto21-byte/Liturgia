@@ -104,7 +104,19 @@
       .catch(() => {});
   })();
 
-  window.Festas = { list, byDate, add, remove, onChange, ready: () => hidratada };
+  /* Relê as festas do armazenamento (usado pela sincronização com a conta quando chegam festas de outro aparelho). */
+  async function recarregar() {
+    const S = window.CalendariumStore;
+    if (!S) return false;
+    const regs = await Promise.resolve(safe(() => S.getAll(STORE), [])).catch(() => []);
+    const novo = [];
+    (Array.isArray(regs) ? regs : []).forEach((r) => { const f = normalizar(r); if (f) novo.push(f); });
+    cache = novo; ordenar(); removidos.clear();
+    notificar();
+    return true;
+  }
+
+  window.Festas = { list, byDate, add, remove, onChange, ready: () => hidratada, recarregar };
 
   /* ====================================================================
      DIÁLOGO

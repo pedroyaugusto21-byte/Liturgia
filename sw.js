@@ -1,7 +1,7 @@
 /* Service worker do Calendarium: guarda os arquivos do app para abrir offline e permitir a instalação.
    Para publicar uma atualização, aumente VERSAO. */
-const VERSAO = 'calendarium-v1';
-const ARQUIVOS = ['./', 'app.js', 'astral.css', 'astral.js', 'calendarium.css', 'favicon-16.png', 'favicon-32.png', 'favicon-48.png', 'favicon.ico', 'festas.js', 'hinos-orficos.js', 'icone-lira-180.png', 'icone-lira-192.png', 'icone-lira-512.png', 'icone-lira-maskable-512.png', 'index.html', 'liturgy.js', 'lunar.js', 'manifest.webmanifest', 'mansoes-lunares.js', 'mansoes.css', 'ouranos-data.js', 'ouranos.js', 'store.js', 'teurgica.css', 'teurgica.js', 'versos-aureos.js'];
+const VERSAO = 'calendarium-v2';
+const ARQUIVOS = ['./', 'app.js', 'astral.css', 'astral.js', 'calendarium.css', 'favicon-16.png', 'favicon-32.png', 'favicon-48.png', 'favicon.ico', 'festas.js', 'firebase-config.js', 'nuvem.js', 'conta.js', 'hinos-orficos.js', 'icone-lira-180.png', 'icone-lira-192.png', 'icone-lira-512.png', 'icone-lira-maskable-512.png', 'index.html', 'liturgy.js', 'lunar.js', 'manifest.webmanifest', 'mansoes-lunares.js', 'mansoes.css', 'ouranos-data.js', 'ouranos.js', 'store.js', 'teurgica.css', 'teurgica.js', 'versos-aureos.js'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(VERSAO).then((c) => Promise.all(ARQUIVOS.map((u) => c.add(u).catch(() => {})))).then(() => self.skipWaiting()));

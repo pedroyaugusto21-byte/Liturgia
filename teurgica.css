@@ -375,3 +375,37 @@ dialog#festaDialog::backdrop { background: rgba(5, 8, 16, .75); }
 #teurgicaView .teu-det-phot-nao { color: #E0816A; }
 #teurgicaView .teu-leg-phok i { width: 18px; height: 18px; border-radius: 50%; background: var(--teu-green); }
 #teurgicaView .teu-leg-phno i { color: var(--teu-red); font-size: 16px; }
+
+
+/* ======================================================================
+   ABA 5.4 — CONTA (login e sincronização)
+   ====================================================================== */
+#teurgicaView .teu-conta { max-width: 720px; margin: 0 auto 20px; }
+#teurgicaView .teu-conta-barra { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 8px 14px; }
+#teurgicaView .teu-conta-estado { font-size: 13px; line-height: 1.4; color: var(--teu-muted); text-align: center; }
+#teurgicaView .teu-conta-estado:empty { display: none; }
+#teurgicaView .teu-conta-painel {
+  margin-top: 12px; padding: 16px; border-radius: 12px; border: 1px solid rgba(201, 164, 92, .3);
+  background: rgba(11, 17, 32, .6); display: flex; flex-direction: column; gap: 14px;
+}
+#teurgicaView .teu-conta-painel[hidden], #teurgicaView .teu-conta-painel [hidden] { display: none; }
+#teurgicaView .teu-conta-txt { font-size: 14px; line-height: 1.6; color: var(--teu-text); }
+#teurgicaView .teu-conta-form, #teurgicaView .teu-conta-logado { display: flex; flex-direction: column; gap: 12px; }
+#teurgicaView .teu-conta-campo { display: flex; flex-direction: column; gap: 4px; }
+#teurgicaView .teu-conta-campo label { font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: var(--teu-gold); }
+#teurgicaView .teu-conta-campo input {
+  min-height: 44px; padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(201, 164, 92, .4);
+  background: var(--teu-bg); color: var(--teu-text); font-family: 'Jost', system-ui, sans-serif; font-size: 16px;
+}
+#teurgicaView .teu-conta-acoes { display: flex; flex-wrap: wrap; gap: 10px; }
+#teurgicaView .teu-conta-acoes .teu-btn { min-height: 44px; }
+#teurgicaView .teu-conta-acoes .teu-btn[disabled], #teurgicaView .teu-conta-form .teu-btn[disabled] { opacity: .55; cursor: default; }
+#teurgicaView .teu-conta-decisao { padding: 14px; border-radius: 10px; border: 1px solid rgba(243, 208, 138, .55); background: rgba(201, 164, 92, .08); display: flex; flex-direction: column; gap: 10px; }
+#teurgicaView .teu-conta-dec-h { font-family: 'Cormorant Garamond', serif; font-size: 20px; font-weight: 600; color: var(--teu-gold-hi); }
+#teurgicaView .teu-conta-dec-h:focus-visible { outline: 2px solid #f3d08a; outline-offset: 3px; }
+#teurgicaView .teu-conta-msg { font-size: 14px; line-height: 1.4; color: var(--teu-green); font-weight: 500; }
+#teurgicaView .teu-conta-msg.teu-erro { color: #E0816A; }
+#teurgicaView .teu-conta-msg:empty { display: none; }
+@media (max-width: 560px) {
+  #teurgicaView .teu-conta-acoes .teu-btn { flex: 1 1 100%; }
+}

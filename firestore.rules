@@ -1,0 +1,103 @@
+rules_version = '2';
+
+// REGRAS DE SEGURANÇA DO CALENDARIUM (Firestore)
+// Quem decide quem lê e escreve é ESTE arquivo, que roda no servidor do Google.
+// Esconder botões no site não protege nada; estas regras protegem.
+//
+// Resumo:
+//  1. Cada pessoa só enxerga a própria pasta:  usuarios/<id-da-pessoa>/...
+//  2. Quem não entrou na conta (anônimo) não lê nem escreve nada.
+//  3. Só existem três coleções: diario, diario_log e festas. Qualquer outro caminho é proibido.
+//  4. Cada documento precisa ter o formato esperado (campos, tipos e tamanhos), para que
+//     lixo ou texto gigante não entrem no banco.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- funções auxiliares ----------
+
+    // true se quem faz o pedido entrou na conta E é o dono da pasta
+    function dono(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    // todo documento carrega o instante em que foi enviado (usado na sincronização)
+    function temCarimbo(d) {
+      return d.atualizadoEm is string && d.atualizadoEm.size() <= 40;
+    }
+
+    // ---------- DIÁRIO: um documento por dia, id no formato AAAA-MM-DD ----------
+    function diarioNormal(d) {
+      return d.keys().hasOnly(['data', 'id', 'texto', 'clima', 'photagogia', 'criadoEm', 'salvoEm', 'atualizadoEm'])
+        && d.keys().hasAll(['data', 'texto', 'clima', 'photagogia', 'atualizadoEm'])
+        && d.texto is string && d.texto.size() <= 10000          // texto do diário: até 10 mil caracteres
+        && d.photagogia is bool
+        && d.clima is map
+        && d.clima.keys().hasOnly(['amanhecer', 'entardecer', 'noite'])
+        && d.clima.get('amanhecer', []) is list && d.clima.get('amanhecer', []).size() <= 12
+        && d.clima.get('entardecer', []) is list && d.clima.get('entardecer', []).size() <= 12
+        && d.clima.get('noite', []) is list && d.clima.get('noite', []).size() <= 12
+        && (!('id' in d) || (d.id is string && d.id.size() <= 64))
+        && (!('criadoEm' in d) || (d.criadoEm is string && d.criadoEm.size() <= 40))
+        && (!('salvoEm' in d) || (d.salvoEm is string && d.salvoEm.size() <= 40));
+    }
+    function diarioLapide(d) {
+      return d.keys().hasOnly(['data', 'apagado', 'atualizadoEm']) && d.apagado == true;
+    }
+    match /usuarios/{uid}/diario/{dia} {
+      allow read, delete: if dono(uid);
+      allow create, update: if dono(uid)
+        && dia.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}')              // o id do documento é a data do dia
+        && request.resource.data.data == dia
+        && temCarimbo(request.resource.data)
+        && (diarioNormal(request.resource.data) || diarioLapide(request.resource.data));
+    }
+
+    // ---------- LOG DE SALVAMENTOS: um documento por salvamento ----------
+    function logNormal(d, id) {
+      return d.keys().hasOnly(['data', 'salvoEm', 'hora', 'horas', 'acao', 'nuvemId', 'atualizadoEm'])
+        && d.keys().hasAll(['data', 'salvoEm', 'hora', 'horas', 'acao', 'nuvemId', 'atualizadoEm'])
+        && d.nuvemId == id
+        && d.data is string && d.data.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}')
+        && d.salvoEm is string && d.salvoEm.size() > 0 && d.salvoEm.size() <= 40
+        && d.hora is string && d.hora.matches('[0-9]{2}:[0-9]{2}:[0-9]{2}')
+        && d.horas is number && d.horas >= 0 && d.horas <= 24
+        && d.acao in ['criou', 'atualizou'];
+    }
+    function logLapide(d) {
+      return d.keys().hasOnly(['apagado', 'atualizadoEm']) && d.apagado == true;
+    }
+    match /usuarios/{uid}/diario_log/{logId} {
+      allow read, delete: if dono(uid);
+      allow create, update: if dono(uid)
+        && logId.size() <= 80
+        && temCarimbo(request.resource.data)
+        && (logNormal(request.resource.data, logId) || logLapide(request.resource.data));
+    }
+
+    // ---------- FESTAS PESSOAIS ----------
+    function festaNormal(d, id) {
+      return d.keys().hasOnly(['id', 'data', 'nome', 'descricao', 'criadoEm', 'atualizadoEm'])
+        && d.keys().hasAll(['id', 'data', 'nome', 'descricao', 'criadoEm', 'atualizadoEm'])
+        && d.id == id
+        && d.data is string && d.data.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}')
+        && d.nome is string && d.nome.size() >= 1 && d.nome.size() <= 60
+        && d.descricao is string && d.descricao.size() <= 280
+        && d.criadoEm is number;
+    }
+    function festaLapide(d, id) {
+      return d.keys().hasOnly(['id', 'apagado', 'atualizadoEm']) && d.id == id && d.apagado == true;
+    }
+    match /usuarios/{uid}/festas/{festaId} {
+      allow read, delete: if dono(uid);
+      allow create, update: if dono(uid)
+        && festaId.matches('[A-Za-z0-9_-]{1,64}')
+        && temCarimbo(request.resource.data)
+        && (festaNormal(request.resource.data, festaId) || festaLapide(request.resource.data, festaId));
+    }
+
+    // ---------- todo o resto é proibido ----------
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

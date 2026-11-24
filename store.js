@@ -6,6 +6,9 @@
    Backends, em ordem de preferência: IndexedDB → localStorage
    (chaves 'calendarium.store.<nome>') → memória. Nenhum método lança exceção
    nem rejeita a promessa: em falha total devolvem null / [] / {ok:false}.
+   Aditivo (etapa 4, sincronização): onChange(fn) avisa cada gravação/remoção;
+   put/add/delete aceitam um último argumento { silencioso:true } (não avisa);
+   clearAll() apaga tudo (usado só ao sair da conta, a pedido da pessoa).
    ====================================================================== */
 (function () {
   'use strict';
@@ -177,6 +180,34 @@
     return vazio;
   }
 
+  /* ---------- aviso de mudanças (aditivo) ---------- */
+  const ouvintes = [];
+  function onChange(fn) {
+    if (typeof fn !== 'function') return () => {};
+    ouvintes.push(fn);
+    return () => { const i = ouvintes.indexOf(fn); if (i >= 0) ouvintes.splice(i, 1); };
+  }
+  function avisar(ev) { ouvintes.slice().forEach((fn) => safe(() => fn(ev))); }   /* uma falha em fn nunca afeta o store */
+  const mudo = (o) => ehObj(o) && o.silencioso === true;
+
+  async function gravarComAviso(op, n, v, opcoes) {
+    const k = await executar(op, [n, v], null);
+    if (k !== null && !mudo(opcoes)) avisar({ nome: n, op: op, chave: k, valor: ehObj(v) ? clonar(v) : v });
+    return k;
+  }
+  async function apagarComAviso(n, k, opcoes) {
+    const r = await executar('delete', [n, k], false);
+    if (r && !mudo(opcoes)) avisar({ nome: n, op: 'delete', chave: k, valor: null });
+    return r;
+  }
+  async function clearAll() {
+    for (const n of NOMES) {
+      const regs = (await executar('getAll', [n], [])) || [];
+      for (const r of regs) { const k = r && r[SCHEMA[n].keyPath]; if (k !== undefined && k !== null) await executar('delete', [n, k], false); }
+    }
+    return true;
+  }
+
   async function exportAll() {
     const stores = {};
     for (const n of NOMES) stores[n] = (await executar('getAll', [n], [])) || [];
@@ -198,8 +229,9 @@
         if (valido && n === 'diario') valido = typeof r.data === 'string' && RE_DATA.test(r.data);
         if (!valido) { ignorados[n]++; continue; }
         const usaPut = n !== 'diario_log' || (typeof r.seq === 'number' && isFinite(r.seq));
-        const k = await executar(usaPut ? 'put' : 'add', [n, r], null);
-        if (k === null) ignorados[n]++; else importados[n]++;
+        const op = usaPut ? 'put' : 'add';
+        const k = await executar(op, [n, r], null);
+        if (k === null) ignorados[n]++; else { importados[n]++; avisar({ nome: n, op: op, chave: k, valor: clonar(r) }); }
       }
     }
     return { ok: true, importados, ignorados };
@@ -210,11 +242,13 @@
     stores: NOMES.slice(),
     ready: () => iniciar().then(() => (fila && fila[0] ? fila[0].nome : 'memoria')),
     get: (n, k) => executar('get', [n, k], null),
-    put: (n, v) => executar('put', [n, v], null),
-    delete: (n, k) => executar('delete', [n, k], false),
+    put: (n, v, opcoes) => gravarComAviso('put', n, v, opcoes),
+    delete: (n, k, opcoes) => apagarComAviso(n, k, opcoes),
     getAll: (n) => executar('getAll', [n], []),
-    add: (n, v) => executar('add', [n, v], null),
+    add: (n, v, opcoes) => gravarComAviso('add', n, v, opcoes),
     exportAll,
     importAll,
+    onChange,
+    clearAll,
   };
 })();

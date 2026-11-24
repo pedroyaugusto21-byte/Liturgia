@@ -193,6 +193,7 @@
       selecionar(SUBS[j].id, true);
     });
     document.addEventListener('visibilitychange', ajustarRelogio);
+    safe(() => { if (window.ContaNuvem) window.ContaNuvem.montar(wrap); });   /* cartão de conta (etapa 4); sem ele, a aba é a mesma de antes */
   }
 
   /* troca de sub-aba (painéis + roving tabindex + aria-selected) */
@@ -866,5 +867,23 @@
   function deactivate() {
     try { ativa = false; ajustarRelogio(); } catch (e) { /* falha segura */ }
   }
+  /* Dados chegaram da nuvem (outro aparelho) ou foram apagados ao sair da conta: atualiza o que está na tela
+     sem sobrescrever o que a pessoa está escrevendo agora. */
+  window.addEventListener('calendarium:nuvem-dados', (ev) => {
+    try {
+      const d = (ev && ev.detail) || {};
+      relSujo = true;
+      if (d.festas || d.tudo) safe(() => { if (window.Festas && typeof window.Festas.recarregar === 'function') window.Festas.recarregar(); });
+      if (diarioPronto) {
+        const atinge = d.tudo || d.logs || (Array.isArray(d.diario) && d.diario.indexOf(dataSel) >= 0);
+        if (atinge) {
+          if (!sujo) carregarNoForm(false).then(() => { if (d.diario && d.diario.indexOf(dataSel) >= 0) estado('Este dia foi atualizado a partir da sua conta.', false); });
+          else { atualizarSalvos(); if (d.tudo || (d.diario && d.diario.indexOf(dataSel) >= 0)) estado('Há uma versão deste dia na sua conta. O que você digitou foi mantido; se salvar, ele substitui a da conta.', true); }
+        }
+      }
+      if (ativa && sub === 'relatorio' && relPronto) renderRelatorio();
+    } catch (e) { /* falha segura */ }
+  });
+
   window.Teurgica = { activate, deactivate, info: () => ({ ativa, sub, relogio: !!timer }) };
 })();
