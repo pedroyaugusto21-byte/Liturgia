@@ -79,7 +79,7 @@ function newMoonJD(k) {
     + 0.00208 * Math.sin(2 * M) - 0.00111 * Math.sin(Mp - 2 * F) - 0.00057 * Math.sin(Mp + 2 * F)
     + 0.00056 * Math.sin(2 * Mp + M) - 0.00042 * Math.sin(3 * Mp);
 }
-const monthName = (i) => `${ORDINALS[i % 3]} da ${SEASONS[Math.floor(i / 3)]}`;
+const monthName = (i) => `${ORDINALS[i % 3]} d/ ${SEASONS[Math.floor(i / 3)]}`;
 const litDay = (ms) => Math.floor((ms - new Date(ms).getTimezoneOffset() * 60000 - DAWN * HOUR_MS) / DAY_MS);
 const jdToMs = (jd) => (jd - 2440587.5) * DAY_MS;
 const monthStartDay = (k) => litDay(jdToMs(newMoonJD(k))) + 1;
