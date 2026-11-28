@@ -33,10 +33,12 @@
     gravarSessao();
     const imediato = !!(opts && opts.imediato);
     const tinhaFoco = introEl.contains(document.activeElement);
-    if (imediato) { introEl.style.display = 'none'; }
+    /* avisa quem espera a intro acabar (ex.: o aviso de atualização, em atualizacao.js) */
+    const fimDaIntro = () => { try { document.dispatchEvent(new CustomEvent('calendarium:intro-fim')); } catch (e) { /* ignora */ } };
+    if (imediato) { introEl.style.display = 'none'; fimDaIntro(); }
     else {
       introEl.classList.add('fade-out');
-      setTimeout(() => { introEl.style.display = 'none'; }, 1000);
+      setTimeout(() => { introEl.style.display = 'none'; fimDaIntro(); }, 1000);
     }
     choice.removeAttribute('inert');
     /* só leva o foco ao menu se a pessoa ainda está na tela de escolha */

@@ -139,6 +139,10 @@
   #liturgyView button { cursor: pointer; font-family: inherit; border: none; background: none; color: inherit; }
   #liturgyView .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 6px; font-size: 12px; border: 1px solid rgba(201,164,92,0.25); color: rgba(239,230,210,0.6); transition: background .15s; white-space: nowrap; }
   #liturgyView .btn:hover { background: rgba(201,164,92,0.1); }
+  #liturgyView .dawn-ctl { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin-top: 14px; }
+  #liturgyView .dawn-msg { margin: 0; font-size: 12px; line-height: 1.5; color: rgba(239,230,210,0.62); }
+  #liturgyView .dawn-msg:empty { display: none; }
+  #liturgyView .hemi-ctl { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin-top: 14px; }
   #liturgyView .btn-on { border-color: #f3d08a; background: rgba(201,164,92,0.15); color: #f3d08a; }
   #liturgyView .btn-now { border-color: rgba(201,164,92,0.4); color: #f3d08a; }
   #liturgyView .btn-play { background: #c9a45c; color: #0b1120; border: none; font-weight: 500; padding: 8px 16px; }

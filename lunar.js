@@ -7,11 +7,22 @@ const PHASE_NAMES  = ['Lua Nova','Crescente Côncava','Quarto Crescente','Cresce
 let current = new Date();
 let hovered = null;
 
-function lunarAge(date) {
-  const ref = new Date(2000, 0, 6, 18, 14, 0);
-  const cycle = 29.53058867;
+const CYCLE = 29.53058867;
+/* Reserva (ciclo médio): usada só se MansoesLunares/OuranosCalc não estiverem disponíveis */
+function lunarAgeMean(date) {
+  const ref = new Date(Date.UTC(2000, 0, 6, 18, 14, 0)); /* Lua Nova de referência em UTC (independe do fuso do navegador) */
   const diff = (date - ref) / 86400000;
-  return ((diff % cycle) + cycle) % cycle;
+  return ((diff % CYCLE) + CYCLE) % CYCLE;
+}
+/* Idade lunar equivalente à elongação Sol–Lua (Meeus), em dias do ciclo médio */
+function lunarAge(date) {
+  try {
+    if (window.MansoesLunares && MansoesLunares.elongation) {
+      const e = MansoesLunares.elongation(date);
+      if (e !== null && isFinite(e)) return (e / 360) * CYCLE;
+    }
+  } catch (err) { /* usa o ciclo médio */ }
+  return lunarAgeMean(date);
 }
 function phaseIdx(age)  { return Math.floor((age / 29.53058867) * 8) % 8; }
 function phaseName(age) { return PHASE_NAMES[phaseIdx(age)]; }
@@ -23,17 +34,45 @@ function keyPhase(age) {
   return null;
 }
 
-const DPR = window.devicePixelRatio || 1;
-const SIZE = Math.min(window.innerWidth - 80, 360);
+/* Fases principais do mês exibido: dia do mês -> 'nova'|'cres'|'cheia'|'min'.
+   Usa o instante exato (elongação 0/90/180/270°) no dia LOCAL; sem MansoesLunares, volta às janelas do ciclo médio. */
+let keyDays = {};
+function computeKeyDays(y, m) {
+  const map = {};
+  try {
+    if (window.MansoesLunares && MansoesLunares.phaseInstants) {
+      const list = MansoesLunares.phaseInstants(new Date(y, m, 1).getTime(), new Date(y, m + 1, 1).getTime());
+      if (list.length) {
+        list.forEach(p => { const d = new Date(p.ms).getDate(); if (!map[d]) map[d] = p.k; });
+        return map;
+      }
+    }
+  } catch (err) { /* usa a reserva */ }
+  const days = new Date(y, m + 1, 0).getDate();
+  for (let d = 1; d <= days; d++) { const k = keyPhase(lunarAge(new Date(y, m, d))); if (k) map[d] = k; }
+  return map;
+}
+
+/* Dimensões do canvas (etapa C): recalculadas no carregamento e a cada resize/giro (ver o fim do arquivo).
+   O estado da aba (current, hovered, keyDays) fica fora daqui e não é tocado. */
+let DPR = 1, SIZE = 360, CX = 180, CY = 180, R_OUTER = 0, R_INNER = 0, R_LABEL = 0, R_MOON = 0;
 const canvas = document.getElementById('moonCanvas');
-canvas.width  = SIZE * DPR;
-canvas.height = SIZE * DPR;
-canvas.style.width  = SIZE + 'px';
-canvas.style.height = SIZE + 'px';
 const ctx = canvas.getContext('2d');
-ctx.scale(DPR, DPR);
-const CX = SIZE / 2, CY = SIZE / 2;
-const R_OUTER = SIZE * 0.41, R_INNER = SIZE * 0.295, R_LABEL = SIZE * 0.345, R_MOON  = SIZE * 0.13;
+function dimensiona() {
+  const dpr = window.devicePixelRatio || 1;
+  const size = Math.max(160, Math.min(window.innerWidth - 80, 360));
+  if (size === SIZE && dpr === DPR && canvas.width) return false;   /* nada mudou (ex.: só a altura, na barra do navegador) */
+  DPR = dpr; SIZE = size;
+  canvas.width  = Math.round(SIZE * DPR);
+  canvas.height = Math.round(SIZE * DPR);
+  canvas.style.width  = SIZE + 'px';
+  canvas.style.height = SIZE + 'px';
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);   /* setTransform (e não scale): redimensionar o canvas zera a matriz, e assim ela nunca se acumula */
+  CX = SIZE / 2; CY = SIZE / 2;
+  R_OUTER = SIZE * 0.41; R_INNER = SIZE * 0.295; R_LABEL = SIZE * 0.345; R_MOON = SIZE * 0.13;
+  return true;
+}
+dimensiona();
 
 function drawMoon(cx, cy, r, age) {
   const frac = age / 29.53;
@@ -85,7 +124,7 @@ function draw() {
     const mid = sa + seg / 2;
     const isToday   = isNow && today.getDate() === d;
     const isHovered = hovered === d;
-    const isKey     = keyPhase(age);
+    const isKey     = keyDays[d] || null;
     ctx.beginPath();
     ctx.arc(CX, CY, R_OUTER, sa, ea);
     ctx.arc(CX, CY, R_INNER, ea, sa, true);
@@ -135,7 +174,7 @@ function updatePhases() {
   const found = [], seen = new Set();
   const meta = { nova: ['🌑','Lua Nova'], cres: ['🌓','Quarto Crescente'], cheia: ['🌕','Lua Cheia'], min: ['🌗','Quarto Minguante'] };
   for (let d = 1; d <= days; d++) {
-    const k = keyPhase(lunarAge(new Date(y, m, d)));
+    const k = keyDays[d];
     if (k && !seen.has(k)) { seen.add(k); found.push({ d, ...meta[k] }); }
   }
   document.getElementById('phaseGrid').innerHTML = found.map(f => `
@@ -187,10 +226,15 @@ function changeMonth(delta) {
 function render() {
   const m = current.getMonth(), y = current.getFullYear();
   document.getElementById('monthYear').textContent = MONTHS[m] + ' · ' + y;
+  keyDays = computeKeyDays(y, m);
   updatePhases(); draw();
 }
 window.changeMonth = changeMonth;
+/* botões ‹ › do mês: ligados aqui (antes eram onclick inline no index.html); continuam <button> com aria-label, então Enter/Espaço funcionam como antes */
+document.querySelectorAll('[data-mes]').forEach(function (b) { b.addEventListener('click', function () { changeMonth(Number(b.getAttribute('data-mes'))); }); });
 window.lunarRender = render;
+/* resize / giro de tela: recalcula o tamanho e redesenha o mês que está na tela (mesmo mês, mesmo dia sob o cursor) */
+if (window.CalendariumResize) window.CalendariumResize.aoRedimensionar(function () { if (dimensiona()) draw(); });
 render();
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(render);
 })();

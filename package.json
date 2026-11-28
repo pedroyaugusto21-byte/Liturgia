@@ -1,0 +1,30 @@
+{
+  "name": "calendarium",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Calendarium (Liturgia): PWA estático. Este package.json serve apenas aos testes; o site não usa npm nem build.",
+  "scripts": {
+    "gerar-sw": "node scripts/gerar-sw.js",
+    "verificar-sw": "node scripts/gerar-sw.js --verificar",
+    "test": "node tests/teste-sw.js && node tests/teste-dados.js && node tests/teste-atualizacao.js && node tests/teste-caracterizacao.js && node tests/teste-etapa1.js && node tests/teste-etapa2.js && node tests/teste-amanhecer.js && node tests/teste-hemisferio.js && node tests/teste-redimensionar.js && node tests/teste-importar.js && node tests/teste-importar-e2e.js && node tests/teste-cripto.js && node tests/teste-nuvem-cripto.js",
+    "test:car": "node tests/teste-caracterizacao.js",
+    "test:sw": "node tests/teste-sw.js",
+    "test:etapa1": "node tests/teste-etapa1.js",
+    "test:etapa2": "node tests/teste-etapa2.js",
+    "test:amanhecer": "node tests/teste-amanhecer.js",
+    "test:hemisferio": "node tests/teste-hemisferio.js",
+    "test:redimensionar": "node tests/teste-redimensionar.js",
+    "test:importar": "node tests/teste-importar.js",
+    "test:importar:e2e": "node tests/teste-importar-e2e.js",
+    "test:dados": "node tests/teste-dados.js",
+    "test:atualizacao": "node tests/teste-atualizacao.js",
+    "test:cripto": "node tests/teste-cripto.js",
+    "test:nuvem-cripto": "node tests/teste-nuvem-cripto.js",
+    "test:cofre-ui": "python3 tests/teste-cofre-ui.py",
+    "test:regras": "firebase emulators:exec --only firestore \"node tests/teste-regras-cripto.js\""
+  },
+  "devDependencies": {
+    "playwright": "1.63.0",
+    "sharp": "^0.35.4"
+  }
+}

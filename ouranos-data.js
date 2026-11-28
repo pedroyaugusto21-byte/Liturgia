@@ -1,6 +1,44 @@
-/* Dados astronômicos do módulo Urano — Anima Mundi.
-   Carregado como script clássico; as três constantes ficam no
-   escopo léxico global e são consumidas pelo Ouranos IIFE. */
+/* ======================================================================
+   DADOS ASTRONÔMICOS do módulo Urano (Anima Mundi) — SOMENTE DADOS, sem código.
+   Script clássico (sem módulos). As três constantes abaixo são "const" de topo de script: ficam no escopo
+   léxico global (NÃO viram propriedades de window) e são lidas por ouranos.js, astral-calc.js e astral.js.
+   Nomes e formatos abaixo são contrato com esses arquivos. Carregar antes deles (ver index.html).
+
+   CONVENÇÕES
+     ra    ascensão reta, em HORAS decimais (0 ≤ ra < 24; 1 h = 15°)
+     dec   declinação, em GRAUS decimais (−90 … +90; negativo = hemisfério sul)
+     mag   magnitude aparente visual (sem unidade; MENOR = mais brilhante; Sirius ≈ −1,46)
+     Época/equinócio: J2000.0 (é como astral-calc.js trata estes valores, aplicando a precessão a partir dela).
+     Precisão gravada: 2 casas decimais em CONSTELLATIONS, 3 em NAMED_STARS.
+
+   CONSTELLATIONS — 35 figuras para o desenho da esfera (não são as 88 oficiais; essas estão em SYMBOL_CATALOG)
+     { name:  "Orion"            nome (latim/inglês)
+       abbr:  "Ori"             abreviação IAU de 3 letras (liga com SYMBOL_CATALOG[].a)
+       stars: [ {ra, dec, mag}, … ]      estrelas do traçado; a posição na lista é o índice usado em "lines"
+       lines: [ [i, j], … ] }            segmentos que ligam stars[i] a stars[j]
+
+   NAMED_STARS — 112 estrelas nomeadas
+     { n: "Sirius"   nome
+       d: "α CMa"     designação (letra de Bayer + constelação)
+       ra, dec        como em CONVENÇÕES
+       m: -1.46       magnitude aparente visual
+       c: "#CFE4FF" } cor "#RRGGBB" (aproximação visual do tipo espectral; astral-calc.js valida e usa "#e8d9b4" se inválida)
+
+   SYMBOL_CATALOG — as 88 constelações oficiais da IAU
+     { a: "And"             abreviação IAU
+       n: "Andromeda"       nome latino
+       p: "Andrômeda"       nome em pt-BR
+       f: "Andromeda" }     nome-base do arquivo do símbolo caligráfico
+     O símbolo é carregado do site de origem, https://www.suberic.net/~dmm/astro/img/calli/<f>.png
+     (ouranos.js, buildCatalog). Como é imagem de outro site, NÃO entra no cache do service worker
+     (só arquivos da mesma origem e Google Fonts entram) e não aparece offline.
+
+   FONTE E LICENÇA
+     · Símbolos caligráficos: Denis Moskowitz, https://www.suberic.net/~dmm/astro/constellations.html
+       (crédito exibido no app). Licença não declarada aqui: confirme com o autor antes de redistribuir as imagens.
+     · Coordenadas, magnitudes, cores e traçados das figuras: o catálogo de origem NÃO está registrado no repositório.
+       PENDENTE (mantenedor): informar a fonte e a licença aqui. Até lá, trate como sem licença declarada.
+   ====================================================================== */
 
 const CONSTELLATIONS = [
   {name:"Ursa Major",abbr:"UMa",stars:[{ra:11.06,dec:61.75,mag:1.79},{ra:11.03,dec:56.38,mag:2.37},{ra:11.90,dec:53.69,mag:2.44},{ra:12.26,dec:57.03,mag:3.31},{ra:12.90,dec:55.96,mag:1.77},{ra:13.40,dec:54.93,mag:2.27},{ra:13.79,dec:49.31,mag:1.86}],lines:[[0,1],[1,2],[2,3],[3,0],[3,4],[4,5],[5,6]]},

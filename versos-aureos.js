@@ -63,7 +63,7 @@ const VERSOS_AUREOS = [
   'Como enormes cilindros, eles rolam para frente e para trás, e sempre oprimidos com inúmeros males.',
   'Pois a Contenda fatal, natural, persegue-os em toda parte, jogando-os para cima e para baixo; nem percebem isso.',
   'Em vez de provocá-la e agitá-la, devem evitá-la cedendo.',
-  'Ó! Zeus , nosso Pai! Se libertardes os homens de todos os males que os oprimem,',
+  'Ó! Zeus, nosso Pai! Se libertardes os homens de todos os males que os oprimem,',
   'Mostrai a eles que tipo de Daimon lhes acompanha.',
   'Mas toma coragem; a raça dos humanos é divina.',
   'A natureza sagrada revela-lhes os Mistérios mais ocultos.',

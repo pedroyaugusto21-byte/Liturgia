@@ -1,0 +1,65 @@
+/* Aviso de atualização do app (atualizacao.js). Discreto, no rodapé; sem animação se a pessoa pede menos movimento. */
+.atualizacao {
+  position: fixed;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
+  transform: translateX(-50%);
+  z-index: 10001;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: min(92vw, 540px);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 14px;
+  padding: 10px 14px;
+  border: 1px solid rgba(201, 164, 92, 0.55);
+  border-radius: 12px;
+  background: rgba(10, 14, 20, 0.96);
+  color: #efe6d2;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+  font: 500 14px/1.4 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+.atualizacao[hidden] { display: none; }
+.atualizacao-txt { margin: 0; text-align: center; }
+.atualizacao-acoes { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.atualizacao-btn {
+  min-height: 36px;
+  padding: 6px 14px;
+  border: 1px solid rgba(201, 164, 92, 0.6);
+  border-radius: 8px;
+  background: transparent;
+  color: #efe6d2;
+  font: inherit;
+  cursor: pointer;
+}
+.atualizacao-btn-ok { background: #c9a45c; border-color: #c9a45c; color: #0a0e14; font-weight: 600; }
+.atualizacao-btn:hover:not(:disabled) { filter: brightness(1.12); }
+.atualizacao-btn:disabled { opacity: 0.6; cursor: default; }
+.atualizacao-btn:focus-visible { outline: 3px solid #f3d08a; outline-offset: 2px; }
+
+/* região viva (role="status"): sempre no DOM, invisível, só para leitores de tela */
+.atualizacao-voz {
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0; border: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* entrada suave só para quem NÃO pediu menos movimento; no modo reduzido não há transição nem animação */
+@media (prefers-reduced-motion: no-preference) {
+  .atualizacao { animation: atualizacao-entra 0.28s ease-out; }
+  .atualizacao-btn { transition: filter 0.15s; }
+}
+@keyframes atualizacao-entra {
+  from { opacity: 0; transform: translate(-50%, 12px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+@media (forced-colors: active) {
+  .atualizacao { border: 2px solid CanvasText; background: Canvas; color: CanvasText; }
+  .atualizacao-btn { border: 2px solid ButtonText; }
+}

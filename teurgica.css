@@ -403,9 +403,25 @@ dialog#festaDialog::backdrop { background: rgba(5, 8, 16, .75); }
 #teurgicaView .teu-conta-decisao { padding: 14px; border-radius: 10px; border: 1px solid rgba(243, 208, 138, .55); background: rgba(201, 164, 92, .08); display: flex; flex-direction: column; gap: 10px; }
 #teurgicaView .teu-conta-dec-h { font-family: 'Cormorant Garamond', serif; font-size: 20px; font-weight: 600; color: var(--teu-gold-hi); }
 #teurgicaView .teu-conta-dec-h:focus-visible { outline: 2px solid #f3d08a; outline-offset: 3px; }
+#teurgicaView .teu-conta-lista { margin: 0; padding-left: 20px; font-size: 14px; line-height: 1.6; color: var(--teu-text); }
+#teurgicaView .teu-conta-modo { margin: 0; padding: 0; border: 0; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+#teurgicaView .teu-conta-modo legend { padding: 0; margin-bottom: 6px; font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: var(--teu-gold); }
+#teurgicaView .teu-conta-radio { display: flex; align-items: flex-start; gap: 10px; min-height: 44px; padding: 8px 10px; border-radius: 8px; font-size: 14px; line-height: 1.5; color: var(--teu-text); cursor: pointer; }
+#teurgicaView .teu-conta-radio input { flex: 0 0 auto; width: 20px; height: 20px; margin: 2px 0 0; accent-color: var(--teu-gold); }
+#teurgicaView .teu-conta-radio input:focus-visible { outline: 2px solid #f3d08a; outline-offset: 3px; }
+#teurgicaView .teu-conta-radio:has(input:focus-visible) { background: rgba(201, 164, 92, .10); }
+#teurgicaView .teu-conta-acoes .teu-btn:focus-visible { outline: 2px solid #f3d08a; outline-offset: 3px; }
 #teurgicaView .teu-conta-msg { font-size: 14px; line-height: 1.4; color: var(--teu-green); font-weight: 500; }
 #teurgicaView .teu-conta-msg.teu-erro { color: #E0816A; }
 #teurgicaView .teu-conta-msg:empty { display: none; }
 @media (max-width: 560px) {
   #teurgicaView .teu-conta-acoes .teu-btn { flex: 1 1 100%; }
 }
+
+/* ---- cofre (criptografia de ponta a ponta do Diário), dentro do painel Conta ---- */
+#teurgicaView .teu-cofre { display: flex; flex-direction: column; gap: 12px; margin-top: 4px; }
+#teurgicaView .teu-cofre[hidden] { display: none; }
+#teurgicaView .teu-cofre-inicio { display: flex; flex-direction: column; gap: 10px; }
+#teurgicaView .teu-cofre .teu-conta-campo input { min-height: 44px; }
+#teurgicaView .teu-cofre .teu-conta-decisao > .teu-conta-acoes .teu-btn[disabled] { opacity: .55; cursor: default; }
+#teurgicaView .teu-cofre .teu-conta-radio input:focus-visible { outline: 2px solid #f3d08a; outline-offset: 3px; }

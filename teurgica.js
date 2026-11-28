@@ -1,7 +1,8 @@
 /* ======================================================================
-   TEÚRGICA (aba 5) — sub-abas Hinário · Diário · Relatório
+   TEÚRGICA (aba 5) — sub-abas Hinário · Diário · Relatório   (INTERFACE)
+   Dados e cálculo ficam em teurgica-dados.js (TeurgicaBase/TeurgicaData) e teurgica-relatorio-calc.js (TeurgicaRelCalc).
    window.Teurgica     = { activate, deactivate, info }
-   window.TeurgicaData = { TAGS, PERIODOS, EXCLUSOES, resumirDia, carregarDia, listarPeriodo }
+   window.TeurgicaData = { TAGS, PERIODOS, EXCLUSOES, resumirDia, carregarDia, listarPeriodo }   (definido em teurgica-dados.js)
    Dependências opcionais (falha segura): CalendariumStore, LiturgyKit, HINOS_ORFICOS.
    Único timer: o relógio do Diário (1 s) — só roda com a aba Teúrgica ativa,
    a sub-aba Diário visível e o documento visível.
@@ -9,129 +10,11 @@
 (function () {
   'use strict';
 
-  const safe = (fn, fb) => { try { return fn(); } catch (e) { return fb; } };
-  const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-  const pad = (n) => String(n).padStart(2, '0');
 
-  const TAGS = Object.freeze(['quente', 'úmido', 'frio', 'seco', 'ameno', 'ensolarado', 'nublado', 'chuvoso', 'ventoso']);
-  const PERIODOS = Object.freeze(['amanhecer', 'entardecer', 'noite']);
-  const EXCLUSOES = Object.freeze({ quente: 'frio', frio: 'quente', 'úmido': 'seco', seco: 'úmido', ensolarado: 'nublado', nublado: 'ensolarado' });
-  const PER_INFO = {
-    amanhecer:  { sym: '🜢', rotulo: 'Clima ao amanhecer' },
-    entardecer: { sym: '🜬', rotulo: 'Clima ao entardecer' },
-    noite:      { sym: '✧', rotulo: 'Clima à noite' },
-  };
-  const TEXTO_MAX = 10000;
-  const RE_DATA = /^\d{4}-\d{2}-\d{2}$/;
-  const CHAVE_ABA = 'calendarium.teurgica.aba';
-  const MESES = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
-  const DIAS = ['domingo','segunda-feira','terça-feira','quarta-feira','quinta-feira','sexta-feira','sábado'];
+  /* dados e cálculo do Relatório (teurgica-dados.js, teurgica-relatorio-calc.js) */
+  const { safe, esc, TAGS, PERIODOS, EXCLUSOES, PER_INFO, TEXTO_MAX, CHAVE_ABA, dataLocal, horaLocal, horasDecimais, dataValida, dataExtenso, fmtBR, novoId, store, carregarDia, listarPeriodo, listarLogs } = window.TeurgicaBase;
+  const { planetasDaSemana, domingoDe, somaDias, anoOk, dataDeStr, ddmm, rotuloSemana, linhaLog, ultimoSalvamento, infoDia, pol, n2, setor, discoLua, mesDe, refDeData, refVizinha, estadoMes } = window.TeurgicaRelCalc;
 
-  /* ---------------- datas (sempre CIVIS e LOCAIS) ---------------- */
-  const dataLocal = (d) => { d = d || new Date(); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); };
-  const horaLocal = (d) => pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
-  const horasDecimais = (d) => d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600;
-  function dataValida(s) {
-    if (typeof s !== 'string' || !RE_DATA.test(s)) return false;
-    const y = +s.slice(0, 4), m = +s.slice(5, 7), d = +s.slice(8, 10);
-    if (y < 100) return false;
-    const dt = new Date(Date.UTC(y, m - 1, d));
-    return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
-  }
-  const dataExtenso = (d) => DIAS[d.getDay()] + ', ' + d.getDate() + ' de ' + MESES[d.getMonth()] + ' de ' + d.getFullYear();
-  const fmtBR = (s) => s.slice(8, 10) + '/' + s.slice(5, 7) + '/' + s.slice(0, 4);
-  const novoId = () => 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-  const store = () => window.CalendariumStore || null;
-
-  /* ====================================================================
-     DADOS (API para a etapa 4)
-     ==================================================================== */
-  function normalizarRegistro(r) {
-    if (!r || typeof r !== 'object' || !dataValida(r.data)) return null;
-    const clima = {};
-    PERIODOS.forEach((p) => {
-      const arr = r.clima && Array.isArray(r.clima[p]) ? r.clima[p] : [];
-      clima[p] = TAGS.filter((t) => arr.indexOf(t) >= 0);
-    });
-    return {
-      data: r.data,
-      id: typeof r.id === 'string' ? r.id.slice(0, 64) : '',
-      texto: typeof r.texto === 'string' ? r.texto.slice(0, TEXTO_MAX) : '',
-      clima,
-      photagogia: r.photagogia === true,
-      criadoEm: typeof r.criadoEm === 'string' ? r.criadoEm : '',
-      salvoEm: typeof r.salvoEm === 'string' ? r.salvoEm : '',
-    };
-  }
-
-  /* Promise<registro|null> do dia civil 'AAAA-MM-DD' */
-  async function carregarDia(data) {
-    const S = store();
-    if (!S || !dataValida(data)) return null;
-    try { return normalizarRegistro(await S.get('diario', data)); } catch (e) { return null; }
-  }
-
-  /* Promise<registro[]> entre duas datas civis (inclusive), em ordem de data */
-  async function listarPeriodo(de, ate) {
-    const S = store();
-    if (!S || !dataValida(de) || !dataValida(ate)) return [];
-    try {
-      const todos = await S.getAll('diario');
-      return (Array.isArray(todos) ? todos : []).map(normalizarRegistro)
-        .filter((r) => r && r.data >= de && r.data <= ate)
-        .sort((a, b) => (a.data < b.data ? -1 : a.data > b.data ? 1 : 0));
-    } catch (e) { return []; }
-  }
-
-  /* Promise<log[]> de salvamentos (diario_log) entre duas datas civis (inclusive), em ordem de salvamento.
-     Descarta linhas malformadas; uma única leitura por período. */
-  async function listarLogs(de, ate) {
-    const S = store();
-    if (!S || !dataValida(de) || !dataValida(ate)) return [];
-    try {
-      const todos = await S.getAll('diario_log');
-      return (Array.isArray(todos) ? todos : [])
-        .filter((l) => l && typeof l === 'object' && typeof l.data === 'string' && l.data >= de && l.data <= ate && dataValida(l.data))
-        .sort((a, b) => (String(a.salvoEm) < String(b.salvoEm) ? -1 : String(a.salvoEm) > String(b.salvoEm) ? 1 : 0));
-    } catch (e) { return []; }
-  }
-
-  /* "a", "a e b", "a, b e c" */
-  function juntarTags(lista) {
-    if (lista.length <= 1) return lista.join('');
-    return lista.slice(0, -1).join(', ') + ' e ' + lista[lista.length - 1];
-  }
-
-  /* Tags em destaque: as que aparecem em pelo menos 2 dos 3 horários; se nenhuma chega a 2,
-     as de maior contagem. Ordem: mais frequentes primeiro, depois a ordem de TAGS. */
-  function destacarTags(tags) {
-    const presentes = TAGS.filter((t) => tags[t] > 0);
-    if (!presentes.length) return [];
-    const max = Math.max.apply(null, presentes.map((t) => tags[t]));
-    const corte = max >= 2 ? 2 : max;
-    return presentes.filter((t) => tags[t] >= corte)
-      .sort((a, b) => (tags[b] - tags[a]) || (TAGS.indexOf(a) - TAGS.indexOf(b)));
-  }
-
-  /* resumo síncrono (função pura) de um registro:
-     { data, temRegistro, temTexto, caracteres, clima, tags:{tag:n}, total, periodosComClima, destaque:[tag], texto }
-     texto: "Dia chuvoso" · "Dia chuvoso e frio" · "Sem clima registrado" (há registro, sem clima) · "Sem registro" */
-  function resumirDia(reg) {
-    const r = normalizarRegistro(reg);
-    if (!r) {
-      return { data: null, temRegistro: false, temTexto: false, caracteres: 0, clima: { amanhecer: [], entardecer: [], noite: [] }, tags: {}, total: 0, periodosComClima: 0, destaque: [], texto: 'Sem registro' };
-    }
-    const tags = {}; let total = 0, periodos = 0;
-    PERIODOS.forEach((p) => { if (r.clima[p].length) periodos++; r.clima[p].forEach((t) => { tags[t] = (tags[t] || 0) + 1; total++; }); });
-    const destaque = destacarTags(tags);
-    return {
-      data: r.data, temRegistro: true, temTexto: r.texto.trim().length > 0, caracteres: r.texto.length, clima: r.clima,
-      tags, total, periodosComClima: periodos, destaque,
-      texto: destaque.length ? 'Dia ' + juntarTags(destaque) : 'Sem clima registrado',
-    };
-  }
-
-  window.TeurgicaData = { TAGS, PERIODOS, EXCLUSOES, resumirDia, carregarDia, listarPeriodo, listarLogs };
 
   /* ====================================================================
      ÍCONES (SVG 24×24, traço fino como o da lira)
@@ -479,57 +362,11 @@
      Datas sempre CIVIS e LOCAIS (chave 'AAAA-MM-DD').
      ==================================================================== */
   /* true: hoje, ainda sem diário, já aparece em vermelho (o dia pode ser escrito até o fim); false: hoje fica neutro até salvar */
-  const HOJE_SEM_DIARIO_VERMELHO = true;
-  const ANO_MIN = 1900, ANO_MAX = 2200;
   const COR_OK = '#7AC97A', COR_NO = '#E05555', COR_OURO = '#f3d08a';
-  const SEMANA_FALLBACK = [
-    { sym: '☉', name: 'Domingo' }, { sym: '☽', name: 'Segunda-feira' }, { sym: '♂', name: 'Terça-feira' }, { sym: '☿', name: 'Quarta-feira' },
-    { sym: '♃', name: 'Quinta-feira' }, { sym: '♀', name: 'Sexta-feira' }, { sym: '♄', name: 'Sábado' },
-  ];
-  const planetasDaSemana = () => safe(() => { const w = window.LiturgyKit && window.LiturgyKit.WEEK; return Array.isArray(w) && w.length === 7 ? w : null; }, null) || SEMANA_FALLBACK;
-  const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
   const mk = (tag, cls, txt) => { const n = document.createElement(tag); if (cls) n.className = cls; if (txt !== undefined) n.textContent = txt; return n; };
-  const domingoDe = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate() - d.getDay());
-  const somaDias = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
-  const anoOk = (d) => d.getFullYear() >= ANO_MIN && d.getFullYear() <= ANO_MAX;
-  const dataDeStr = (s) => new Date(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10));
-  const ddmm = (s) => s.slice(8, 10) + '/' + s.slice(5, 7);
-  const hhmmss = (h) => {
-    const t = Math.floor((((h % 24) + 24) % 24) * 3600 + 1e-6) % 86400;
-    return pad(Math.floor(t / 3600)) + ':' + pad(Math.floor((t % 3600) / 60)) + ':' + pad(t % 60);
-  };
-
   let relModo = 'semanal', relSemIni = null, relMes = null, relToken = 0, relFoco = null, relArmado = null, relToque = 0;
   const relAbertos = new Set();                            /* dias (AAAA-MM-DD) abertos na visão semanal: sobrevive aos redesenhos */
   const rel = {};                                          /* referências do DOM */
-
-  function rotuloSemana(ini) {
-    const fim = somaDias(ini, 6), a = ini.getDate(), b = fim.getDate();
-    if (ini.getMonth() === fim.getMonth()) return a + ' a ' + b + ' de ' + MESES[fim.getMonth()] + ' de ' + fim.getFullYear();
-    if (ini.getFullYear() === fim.getFullYear()) return a + ' de ' + MESES[ini.getMonth()] + ' a ' + b + ' de ' + MESES[fim.getMonth()] + ' de ' + fim.getFullYear();
-    return a + ' de ' + MESES[ini.getMonth()] + ' de ' + ini.getFullYear() + ' a ' + b + ' de ' + MESES[fim.getMonth()] + ' de ' + fim.getFullYear();
-  }
-
-  /* linha do log já validada (dados importados nunca chegam crus à tela) */
-  function linhaLog(l) {
-    let h = typeof l.horas === 'number' && isFinite(l.horas) && l.horas >= 0 && l.horas < 24 ? l.horas : null;
-    if (h === null && typeof l.salvoEm === 'string') { const d = new Date(l.salvoEm); if (!isNaN(d.getTime())) h = horasDecimais(d); }
-    const hora = typeof l.hora === 'string' && /^\d{2}:\d{2}:\d{2}$/.test(l.hora) ? l.hora : (h !== null ? hhmmss(h) : '—');
-    return { horas: h, hora, acao: l.acao === 'criou' || l.acao === 'atualizou' ? l.acao : '—' };
-  }
-  /* hora do ÚLTIMO salvamento do dia (log; senão o salvoEm do registro) */
-  function ultimoSalvamento(reg, logsDia) {
-    for (let i = logsDia.length - 1; i >= 0; i--) { const L = linhaLog(logsDia[i]); if (L.horas !== null) return L; }
-    if (reg && reg.salvoEm) { const d = new Date(reg.salvoEm); if (!isNaN(d.getTime())) { const h = horasDecimais(d); return { horas: h, hora: hhmmss(h), acao: '—' }; } }
-    return null;
-  }
-
-  /* informações de um dia, comuns à semana e ao mês */
-  function infoDia(s, reg, hojeS) {
-    const futuro = s > hojeS;
-    const phot = reg && reg.photagogia ? 'feito' : futuro ? 'futuro' : s === hojeS ? 'aberto' : 'nao';   /* 'nao': o dia virou sem a Photagogia */
-    return { s, reg, tem: !!reg, phot, futuro, hoje: s === hojeS, texto: reg ? resumirDia(reg).texto : (futuro ? 'Dia futuro' : 'Sem registro') };
-  }
 
   const PHOT_ROTULO = { feito: 'Feito', nao: 'Não-feito', aberto: 'em aberto' };
 
@@ -604,53 +441,6 @@
   }
 
   /* ---------- visão mensal ---------- */
-  const pol = (r, a) => { const t = a * Math.PI / 180; return [500 + r * Math.sin(t), 500 - r * Math.cos(t)]; };
-  const n2 = (x) => +x.toFixed(2);
-  function setor(r1, r2, a1, a2) {
-    const g = (a2 - a1) > 180 ? 1 : 0;
-    const [x1, y1] = pol(r2, a1), [x2, y2] = pol(r2, a2), [x3, y3] = pol(r1, a2), [x4, y4] = pol(r1, a1);
-    return 'M' + n2(x1) + ' ' + n2(y1) + 'A' + r2 + ' ' + r2 + ' 0 ' + g + ' 1 ' + n2(x2) + ' ' + n2(y2) + 'L' + n2(x3) + ' ' + n2(y3) + 'A' + r1 + ' ' + r1 + ' 0 ' + g + ' 0 ' + n2(x4) + ' ' + n2(y4) + 'Z';
-  }
-  /* disco lunar: mesma técnica de ouranos.js (disco escuro + parte iluminada; espelhado quando a elongação passa de 180°) */
-  function discoLua(x, y, R, elong) {
-    const cE = Math.cos(elong * Math.PI / 180), rx = (R * Math.abs(cE)).toFixed(2);
-    return '<g transform="translate(' + n2(x) + ' ' + n2(y) + ')' + (elong > 180 ? ' scale(-1 1)' : '') + '" aria-hidden="true">' +
-      '<circle r="' + R + '" fill="#141a26" stroke="rgba(159,176,200,.6)"/>' +
-      '<path d="M0 ' + (-R) + 'A' + R + ' ' + R + ' 0 0 1 0 ' + R + 'A' + rx + ' ' + R + ' 0 0 ' + (cE > 0 ? 0 : 1) + ' 0 ' + (-R) + 'Z" fill="#F0EBD8"/></g>';
-  }
-  /* Período do mês exibido: mês LUNAR do Calendário Litúrgico (LiturgyKit.lunarMonth); sem o kit, cai no mês civil.
-     ref = {k} (lunar) ou {y, m} (civil). Os dias são sempre chaves civis 'AAAA-MM-DD'. */
-  function mesDe(ref) {
-    const K = window.LiturgyKit;
-    if (ref && ref.k !== undefined && K && typeof K.lunarMonthK === 'function') {
-      const lm = safe(() => K.lunarMonthK(ref.k), null);
-      if (lm && lm.dates && lm.dates.length) {
-        const ini = lm.dates[0], fim = lm.dates[lm.dates.length - 1];
-        return { ref: { k: lm.k }, lunar: true, dias: lm.dates, nome: lm.name, romano: lm.roman, ini, fim,
-          intervalo: ddmm(ini) + ' a ' + ddmm(fim) + '/' + fim.slice(0, 4),
-          titulo: 'Mês ' + lm.roman + ' · ' + lm.name };
-      }
-    }
-    const y = ref.y, m = ref.m, n = new Date(y, m + 1, 0).getDate(), dias = [];
-    for (let d = 1; d <= n; d++) dias.push(y + '-' + pad(m + 1) + '-' + pad(d));
-    return { ref: { y, m }, lunar: false, dias, nome: cap(MESES[m]), romano: '', ini: dias[0], fim: dias[n - 1], intervalo: String(y), titulo: cap(MESES[m]) + ' de ' + y };
-  }
-  function refDeData(s) {
-    const K = window.LiturgyKit, lm = K && typeof K.lunarMonth === 'function' ? safe(() => K.lunarMonth(s), null) : null;
-    if (lm && lm.dates && lm.dates.length) return { k: lm.k };
-    const d = dataDeStr(s); return { y: d.getFullYear(), m: d.getMonth() };
-  }
-  function refVizinha(ref, dir) {
-    if (ref.k !== undefined) return { k: ref.k + dir };
-    const d = new Date(ref.y, ref.m + dir, 1); return { y: d.getFullYear(), m: d.getMonth() };
-  }
-  function estadoMes(inf) {
-    if (inf.tem) return 'ok';
-    if (inf.futuro) return 'neutro';
-    if (inf.hoje && !HOJE_SEM_DIARIO_VERMELHO) return 'neutro';
-    return 'no';
-  }
-
   function montarMes(corpo, mi, mapa) {
     const n = mi.dias.length, hojeS = dataLocal(), step = 360 / n;
     const K = window.LiturgyKit, temLua = !!(K && typeof K.moonInfo === 'function');
@@ -877,13 +667,16 @@
       if (diarioPronto) {
         const atinge = d.tudo || d.logs || (Array.isArray(d.diario) && d.diario.indexOf(dataSel) >= 0);
         if (atinge) {
-          if (!sujo) carregarNoForm(false).then(() => { if (d.diario && d.diario.indexOf(dataSel) >= 0) estado('Este dia foi atualizado a partir da sua conta.', false); });
-          else { atualizarSalvos(); if (d.tudo || (d.diario && d.diario.indexOf(dataSel) >= 0)) estado('Há uma versão deste dia na sua conta. O que você digitou foi mantido; se salvar, ele substitui a da conta.', true); }
+          const imp = d.origem === 'importacao';   /* vindo do "Importar backup" (importar.js) */
+          if (!sujo) carregarNoForm(false).then(() => { if (d.diario && d.diario.indexOf(dataSel) >= 0) estado(imp ? 'Este dia foi atualizado a partir do backup importado.' : 'Este dia foi atualizado a partir da sua conta.', false); });
+          else { atualizarSalvos(); if (d.tudo || (d.diario && d.diario.indexOf(dataSel) >= 0)) estado(imp ? 'O backup importado tem uma versão deste dia. O que você digitou foi mantido; se salvar, ele substitui a do backup.' : 'Há uma versão deste dia na sua conta. O que você digitou foi mantido; se salvar, ele substitui a da conta.', true); }
         }
       }
       if (ativa && sub === 'relatorio' && relPronto) renderRelatorio();
     } catch (e) { /* falha segura */ }
   });
 
-  window.Teurgica = { activate, deactivate, info: () => ({ ativa, sub, relogio: !!timer }) };
+  /* temAlteracoesNaoSalvas: true se o Diário tem texto/clima/Photagogia alterados e ainda não salvos
+     (usado por atualizacao.js para avisar antes de recarregar a página). Só lê; não muda nada. */
+  window.Teurgica = { activate, deactivate, info: () => ({ ativa, sub, relogio: !!timer }), temAlteracoesNaoSalvas: () => sujo === true };
 })();

@@ -13,7 +13,7 @@
   const hhmm = (iso) => { const d = new Date(iso); return isNaN(d) ? '' : pad(d.getHours()) + ':' + pad(d.getMinutes()); };
   const plural = (n, a, b) => n + ' ' + (n === 1 ? a : b);
 
-  let montada = false, el = {}, aberto = false, ultimoTexto = '', ultimaDecisao = '', fluxoSair = false;
+  let montada = false, el = {}, aberto = false, ultimoTexto = '', ultimaDecisao = '', fluxoSair = false, fluxoImportar = false, planoImportar = null, ocupadoImportar = false;
 
   const HTML =
     '<h2 class="ou-sr" id="teuContaH">Conta e sincronização</h2>' +
@@ -43,8 +43,23 @@
         '<div class="teu-conta-acoes" id="teuContaAcoes">' +
           '<button type="button" class="teu-btn teu-btn-ok" id="teuContaSync">Sincronizar agora</button>' +
           '<button type="button" class="teu-btn teu-btn-disc" id="teuContaBackup">Baixar backup</button>' +
+          '<button type="button" class="teu-btn teu-btn-disc" id="teuContaImportar">Importar backup</button>' +
+          '<input type="file" id="teuContaArquivo" accept="application/json,.json" hidden>' +
           '<button type="button" class="teu-btn teu-btn-disc" id="teuContaSair">Sair</button>' +
         '</div>' +
+        '<div class="teu-conta-decisao" id="teuContaImpBloco" role="group" aria-labelledby="teuContaImpH" hidden>' +
+          '<h3 class="teu-conta-dec-h" id="teuContaImpH" tabindex="-1">Importar backup</h3>' +
+          '<p class="teu-conta-txt" id="teuContaImpArq"></p>' +
+          '<ul class="teu-conta-lista" id="teuContaImpLista"></ul>' +
+          '<fieldset class="teu-conta-modo" id="teuContaImpModo">' +
+            '<legend>Como importar</legend>' +
+            '<label class="teu-conta-radio"><input type="radio" name="teuContaModo" value="mesclar" checked> <span><strong>Mesclar</strong> — junta o backup ao que já está aqui. Em cada dia, fica a versão salva mais recentemente.</span></label>' +
+            '<label class="teu-conta-radio"><input type="radio" name="teuContaModo" value="substituir"> <span><strong>Substituir</strong> — deixa este aparelho exatamente como o backup.</span></label>' +
+          '</fieldset>' +
+          '<p class="teu-conta-txt" id="teuContaImpAviso"></p>' +
+          '<div class="teu-conta-acoes" id="teuContaImpAcoes"></div>' +
+        '</div>' +
+        '<div class="teu-cofre" id="teuCofre" hidden></div>' +
         '<div class="teu-conta-decisao" id="teuContaSairBloco" role="group" aria-labelledby="teuContaSairH" hidden>' +
           '<h3 class="teu-conta-dec-h" id="teuContaSairH" tabindex="-1"></h3>' +
           '<p class="teu-conta-txt" id="teuContaSairTxt"></p>' +
@@ -65,10 +80,11 @@
   function erro(t) { el.erro.textContent = t || ''; if (t) el.msg.textContent = ''; }
   const limparMsgs = () => { el.msg.textContent = ''; el.erro.textContent = ''; };
 
-  /* ---------- backup (mesmo arquivo da "Exportar cópia" do Diário) ---------- */
-  async function baixarBackup() {
+  /* ---------- backup (mesmo arquivo da "Exportar cópia" do Diário; "Importar backup" lê este mesmo formato) ---------- */
+  async function baixarBackup(quieto) {          /* quieto: chamado pela tela do cofre, que mostra a própria mensagem */
+    quieto = quieto === true;                    /* os botões passam o evento de clique: só um true explícito silencia */
     const S = window.CalendariumStore;
-    if (!S) { erro('Armazenamento indisponível neste navegador.'); return false; }
+    if (!S) { if (!quieto) erro('Armazenamento indisponível neste navegador.'); return false; }
     try {
       const dados = await S.exportAll();
       const blob = new Blob([JSON.stringify(dados, null, 2)], { type: 'application/json' });
@@ -77,9 +93,102 @@
       a.href = url; a.download = 'calendarium-copia-' + d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + '.json';
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => safe(() => URL.revokeObjectURL(url)), 4000);
-      msg('Backup baixado.');
+      if (!quieto) msg('Backup baixado.');
       return true;
-    } catch (e) { erro('Não foi possível baixar o backup.'); return false; }
+    } catch (e) { if (!quieto) erro('Não foi possível baixar o backup.'); return false; }
+  }
+
+  /* ---------- importar backup (lógica em importar.js; aqui só a tela) ---------- */
+  const I = () => window.CalendariumImportar || null;
+  const modoEscolhido = () => { const r = el.impModo.querySelector('input[name="teuContaModo"]:checked'); return r && r.value === 'substituir' ? 'substituir' : 'mesclar'; };
+
+  function linhasResumo(r) {
+    const L = [];
+    const d = r.diario, f = r.festas, g = r.logs;
+    L.push(plural(d.total, 'dia de diário', 'dias de diário') + ' no backup: ' + d.novos + ' novo(s), ' + d.atualizam + ' mais recente(s) que o daqui, ' + d.mantidos + ' já aqui (igual ou mais novo)');
+    L.push(plural(f.total, 'festa pessoal', 'festas pessoais') + ' no backup: ' + f.novos + ' nova(s), ' + f.mantidos + ' já aqui');
+    L.push(plural(g.total, 'registro de horário', 'registros de horário') + ' no backup: ' + g.novos + ' novo(s), ' + g.mantidos + ' já aqui');
+    const ign = r.invalidos.diario + r.invalidos.festas + r.invalidos.diario_log, rep = r.repetidos.diario + r.repetidos.festas + r.repetidos.diario_log;
+    if (ign) L.push(plural(ign, 'registro fora do formato será ignorado', 'registros fora do formato serão ignorados'));
+    if (rep) L.push(plural(rep, 'repetição dentro do backup será descartada', 'repetições dentro do backup serão descartadas'));
+    return L;
+  }
+  function avisoModo(r, modo) {
+    if (modo === 'mesclar') return 'Nada do que já está aqui será apagado.';
+    const a = r.diario.apagariam, b = r.festas.apagariam, c = r.logs.apagariam;
+    const partes = [];
+    if (a) partes.push(plural(a, 'dia de diário', 'dias de diário'));
+    if (b) partes.push(plural(b, 'festa pessoal', 'festas pessoais'));
+    if (c) partes.push(plural(c, 'registro de horário', 'registros de horário'));
+    const sai = partes.length ? 'Serão apagados deste aparelho: ' + partes.join(', ') + ' (não estão no backup). ' : 'Nada será apagado, pois tudo o que está aqui também está no backup. ';
+    const nuvem = (N() && N().estado().fase === 'logado') ? 'Como você está conectado, o que for apagado aqui também sairá da sua conta. ' : '';
+    return sai + nuvem + 'Isso não pode ser desfeito: baixe um backup do que está aqui antes, se quiser guardá-lo.';
+  }
+  function atualizarAvisoImportar() {
+    if (!planoImportar) return;
+    const modo = modoEscolhido();
+    el.impAviso.textContent = avisoModo(planoImportar.resumo, modo);
+    if (el.impOk) el.impOk.textContent = modo === 'substituir' ? 'Substituir tudo' : 'Mesclar';
+  }
+  function mostrarImportar(analise, nomeArquivo) {
+    planoImportar = analise;
+    fluxoImportar = true;
+    el.impArq.textContent = 'Arquivo: ' + nomeArquivo + (analise.exportadoEm ? ' (exportado em ' + analise.exportadoEm.slice(0, 10).split('-').reverse().join('/') + ')' : '') + '.';
+    el.impLista.textContent = '';
+    linhasResumo(analise.resumo).forEach((t) => { const li = document.createElement('li'); li.textContent = t; el.impLista.appendChild(li); });
+    const radios = el.impModo.querySelectorAll('input[name="teuContaModo"]');
+    radios.forEach((r) => { r.checked = r.value === 'mesclar'; });
+    el.impAcoes.textContent = '';
+    el.impOk = botao('Mesclar', 'teu-btn-ok', confirmarImportar);
+    el.impAcoes.append(el.impOk, botao('Baixar backup do que está aqui', 'teu-btn-disc', baixarBackup), botao('Cancelar', '', cancelarImportar));
+    atualizarAvisoImportar();
+    el.impBloco.hidden = false; el.acoes.hidden = true;
+    safe(() => el.impH.focus());
+  }
+  function fecharImportar(focarBotao) {
+    fluxoImportar = false; planoImportar = null; ocupadoImportar = false;
+    el.impBloco.hidden = true; el.acoes.hidden = false;
+    if (focarBotao) safe(() => el.importar.focus());
+  }
+  function cancelarImportar() { limparMsgs(); fecharImportar(true); msg('Importação cancelada. Nada foi alterado.'); }
+
+  async function aoEscolherArquivo() {
+    const f = el.arquivo.files && el.arquivo.files[0];
+    el.arquivo.value = '';
+    limparMsgs();
+    if (!f) return;
+    const M = I();
+    if (!M) { erro('A importação não está disponível nesta versão do site.'); return; }
+    if (f.size > M.MAX_BYTES) { erro('Arquivo grande demais (máximo 5 MB).'); return; }
+    el.importar.disabled = true;
+    try {
+      const texto = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = () => rej(new Error('leitura')); r.readAsText(f); });
+      const a = await M.analisar(texto);
+      if (!a.ok) { erro(a.erro || 'Não foi possível ler o backup.'); return; }
+      mostrarImportar(a, f.name);
+    } catch (e) { erro('Não foi possível ler o arquivo.'); }
+    finally { el.importar.disabled = false; }
+  }
+  async function confirmarImportar() {
+    if (ocupadoImportar || !planoImportar) return;
+    const M = I(), n = N(), s = n ? n.estado() : null;
+    if (s && s.sincronizando) { erro('A sincronização está em andamento. Espere terminar e tente de novo.'); return; }
+    const modo = modoEscolhido();
+    ocupadoImportar = true; limparMsgs();
+    el.impAcoes.querySelectorAll('button').forEach((b) => { b.disabled = true; });
+    const r = await M.aplicar(planoImportar.plano, modo);
+    ocupadoImportar = false;
+    el.impAcoes.querySelectorAll('button').forEach((b) => { b.disabled = false; });
+    if (!r.ok) { erro(r.erro || 'Não foi possível importar o backup.'); return; }
+    fecharImportar(true);
+    const p = [];
+    p.push(plural(r.diario.gravados, 'dia gravado', 'dias gravados'));
+    p.push(plural(r.festas.gravados, 'festa gravada', 'festas gravadas'));
+    p.push(plural(r.logs.gravados, 'registro de horário gravado', 'registros de horário gravados'));
+    let t = 'Backup importado (' + (modo === 'substituir' ? 'substituir' : 'mesclar') + '): ' + p.join(', ') + '.';
+    if (modo === 'mesclar' && r.diario.mantidos) t += ' ' + plural(r.diario.mantidos, 'dia ficou como estava (versão daqui igual ou mais nova)', 'dias ficaram como estavam (versão daqui igual ou mais nova)') + '.';
+    if (modo === 'substituir') { const a = r.diario.apagados + r.festas.apagados + r.logs.apagados; if (a) t += ' ' + plural(a, 'item apagado', 'itens apagados') + ' deste aparelho.'; }
+    msg(t);
   }
 
   /* ---------- texto de estado (sempre em palavras, nunca só cor) ---------- */
@@ -209,7 +318,8 @@
       if (s.erro) p.push(s.erro);
       el.info.textContent = 'Conectado como ' + (s.usuario.email || 'sua conta') + '. ' + p.join(' ');
       el.sync.disabled = s.sincronizando;
-    } else { fluxoSair = false; el.sairBloco.hidden = true; el.acoes.hidden = false; }
+      el.importar.disabled = s.sincronizando;
+    } else { fluxoSair = false; el.sairBloco.hidden = true; fluxoImportar = false; planoImportar = null; el.impBloco.hidden = true; el.acoes.hidden = false; }
   }
 
   /* ---------- ações ---------- */
@@ -260,9 +370,11 @@
       email: q('teuContaEmail'), senha: q('teuContaSenha'), entrar: q('teuContaEntrar'), google: q('teuContaGoogle'), esqueci: q('teuContaEsqueci'),
       decisao: q('teuContaDecisao'), decH: q('teuContaDecH'), decTxt: q('teuContaDecTxt'), decAcoes: q('teuContaDecAcoes'),
       logado: q('teuContaLogado'), info: q('teuContaInfo'), acoes: q('teuContaAcoes'), sync: q('teuContaSync'), backup: q('teuContaBackup'), sair: q('teuContaSair'),
+      importar: q('teuContaImportar'), arquivo: q('teuContaArquivo'), impBloco: q('teuContaImpBloco'), impH: q('teuContaImpH'), impArq: q('teuContaImpArq'), impLista: q('teuContaImpLista'), impModo: q('teuContaImpModo'), impAviso: q('teuContaImpAviso'), impAcoes: q('teuContaImpAcoes'),
       sairBloco: q('teuContaSairBloco'), sairH: q('teuContaSairH'), sairTxt: q('teuContaSairTxt'), sairAcoes: q('teuContaSairAcoes'),
       msg: q('teuContaMsg'), erro: q('teuContaErro') };
     montada = true;
+    if (window.CofreUI && typeof window.CofreUI.montar === 'function') safe(() => window.CofreUI.montar(q('teuCofre')));
     el.btn.addEventListener('click', () => {
       abrirPainel(!aberto);
       if (aberto) { const alvo = !el.form.hidden ? el.email : !el.decisao.hidden ? el.decH : !el.logado.hidden ? el.sync : null; if (alvo) safe(() => alvo.focus()); }
@@ -270,6 +382,7 @@
     el.painel.addEventListener('keydown', (e) => {
       if (e.key !== 'Escape' || !aberto) return;
       if (fluxoSair) { e.preventDefault(); fecharSair(); return; }
+      if (fluxoImportar) { e.preventDefault(); if (!ocupadoImportar) cancelarImportar(); return; }
       if (!el.decisao.hidden) return;           /* pergunta pendente: só se fecha respondendo */
       e.preventDefault(); abrirPainel(false); safe(() => el.btn.focus());
     });
@@ -278,11 +391,14 @@
     el.esqueci.addEventListener('click', aoEsqueci);
     el.sync.addEventListener('click', aoSincronizar);
     el.backup.addEventListener('click', baixarBackup);
+    el.importar.addEventListener('click', () => { limparMsgs(); el.arquivo.click(); });
+    el.arquivo.addEventListener('change', aoEscolherArquivo);
+    el.impModo.addEventListener('change', atualizarAvisoImportar);
     el.sair.addEventListener('click', () => mostrarSair('perguntar'));
     const n = N();
     if (n && typeof n.onEstado === 'function') n.onEstado(atualizar);
     atualizar();
   }
 
-  window.ContaNuvem = { montar };
+  window.ContaNuvem = { montar, baixarBackup };
 })();

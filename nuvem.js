@@ -1,7 +1,9 @@
 /* ======================================================================
    CALENDARIUM NUVEM — login (Firebase Authentication) e sincronização (Firestore)
    window.CalendariumNuvem = { disponivel, estado, onEstado, entrarEmail, entrarGoogle,
-     recuperarSenha, sair, sincronizar, decidir, versaoSdk }
+     recuperarSenha, sair, sincronizar, decidir, versaoSdk,
+     prepararCofre, cancelarCofre, ativarCofre, abrirCofre, abrirComRecuperacao, trancar,
+     trocarFrase, desativarCofre, lembrarNeste }
 
    - Script CLÁSSICO (como os demais). O SDK do Firebase é carregado por import() dinâmico,
      então, se a rede ou o CDN falharem, CalendariumNuvem continua existindo (estado
@@ -12,6 +14,13 @@
    - Dados em  usuarios/{uid}/diario|diario_log|festas  (ver firestore.rules).
    - Conflito: vence o salvoEm mais recente (diário); log unido por nuvemId; festas por id
      (exclusão = documento com apagado:true).
+   - Cofre (opcional, cripto.js): com o cofre ligado, 'diario' e 'diario_log' sobem CIFRADOS
+     (AES-256-GCM, formato v1) e descem decifrados; o armazenamento local não muda. Trancado
+     (sem a chave neste aparelho) o Diário segue local, a fila de diario/diario_log espera e o
+     cursor de leitura NÃO avança por cima de documentos cifrados ainda ilegíveis.
+     Se o estado do cofre não puder ser lido, nada de diario/diario_log sobe (nunca em claro).
+   - App Check (opcional): só liga se firebase-config.js trouxer FIREBASE_APPCHECK_CHAVE; se falhar,
+     o app segue 100% local.
    ====================================================================== */
 (function () {
   'use strict';
@@ -26,6 +35,10 @@
   const RE_ID = /^[A-Za-z0-9_-]{1,64}$/;
   const RE_HORA = /^\d{2}:\d{2}:\d{2}$/;
   const PERIODOS = ['amanhecer', 'entardecer', 'noite'];
+  const COLECOES_CIFRADAS = ['diario', 'diario_log'];
+  const LS_LEMBRAR = 'calendarium.nuvem.lembrar';
+  const LOTE_CIFRA = 100;                 /* documentos cifrados são maiores: lotes menores (limite de 10 MiB por requisição) */
+  const Cripto = () => window.CalendariumCripto || null;
 
   const safe = (fn, fb) => { try { return fn(); } catch (e) { return fb; } };
   const ehObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -50,9 +63,10 @@
   const lsJson = (k, fb) => { const t = lsGet(k); if (t === null) return fb; try { return JSON.parse(t); } catch (e) { return fb; } };
 
   /* ---------- estado público ---------- */
-  const E = { fase: 'carregando', usuario: null, sincronizando: false, pendencias: 0, ultimoSync: null, erro: null, offline: false, decisao: null };
+  const E = { fase: 'carregando', usuario: null, sincronizando: false, pendencias: 0, ultimoSync: null, erro: null, offline: false, decisao: null,
+    cofre: { fase: 'desconhecido', estado: null, recuperacao: false, lembrar: false, disponivel: false, progresso: null, ilegiveis: 0, adiados: 0 }, appCheck: 'desligado' };
   const ouvintesEstado = [];
-  const copiaEstado = () => ({ fase: E.fase, usuario: E.usuario ? { uid: E.usuario.uid, email: E.usuario.email } : null, sincronizando: E.sincronizando, pendencias: E.pendencias, ultimoSync: E.ultimoSync, erro: E.erro, offline: E.offline, decisao: E.decisao ? clonar(E.decisao) : null });
+  const copiaEstado = () => ({ fase: E.fase, usuario: E.usuario ? { uid: E.usuario.uid, email: E.usuario.email } : null, sincronizando: E.sincronizando, pendencias: E.pendencias, ultimoSync: E.ultimoSync, erro: E.erro, offline: E.offline, decisao: E.decisao ? clonar(E.decisao) : null, cofre: clonar(E.cofre), appCheck: E.appCheck });
   function notificar() { const c = copiaEstado(); ouvintesEstado.slice().forEach((fn) => safe(() => fn(c))); }
   function onEstado(fn) {
     if (typeof fn !== 'function') return () => {};
@@ -61,9 +75,26 @@
   }
 
   /* ---------- erros em português ---------- */
+  const MSG_APPCHECK = 'A verificação de segurança do app (App Check) falhou. Se você usa bloqueador de anúncios, libere este site e recarregue. O diário continua funcionando neste aparelho.';
+  let bloqueadoAppCheck = false;
   function msgErro(e) {
     const c = e && (e.code || e.message) ? String(e.code || e.message) : '';
+    if (/app-?check/i.test(c) || (E.appCheck === 'falhou' && /permission-denied|unauthenticated/i.test(c))) { bloqueadoAppCheck = true; return MSG_APPCHECK; }
     const mapa = {
+      'cofre/senha-errada': 'Frase incorreta.',
+      'cofre/recuperacao-errada': 'Chave de recuperação incorreta.',
+      'cofre/cofre-invalido': 'O cofre na nuvem está em formato inesperado ou corrompido. Nada foi alterado.',
+      'cofre/versao': 'Esta versão do app não entende o formato do cofre. Atualize o app (feche e abra de novo com internet).',
+      'cofre/frase-curta': 'A frase precisa ter pelo menos 12 caracteres.',
+      'cofre/rng-ruim': 'O navegador não gerou números aleatórios confiáveis. Nada foi enviado.',
+      'cofre/rng-invalido': 'O navegador não gerou números aleatórios confiáveis. Nada foi enviado.',
+      'cofre/indisponivel': 'Este navegador não oferece a criptografia necessária (é preciso abrir o site por HTTPS).',
+      'cofre/grande': 'Um dia ficou grande demais para cifrar. Nada foi enviado.',
+      'cofre/corrompido': 'Um documento da nuvem não pôde ser decifrado (dado corrompido ou de outra chave). Nada foi alterado.',
+      'cofre/kid': 'Este documento pertence a outra chave do cofre.',
+      'cofre/verificacao': 'A conferência após cifrar não bateu. O cofre ficou incompleto e nada em claro foi apagado; tente continuar.',
+      'cofre/migracao-incompleta': 'Ainda restam dias sem proteger. Use "Continuar" para terminar.',
+      'cofre/inexistente': 'Não há cofre nesta conta.',
       'auth/invalid-credential': 'E-mail ou senha incorretos.',
       'auth/wrong-password': 'E-mail ou senha incorretos.',
       'auth/user-not-found': 'E-mail ou senha incorretos.',
@@ -127,6 +158,7 @@
   const lapide = (n, id) => (n === 'diario' ? { data: id, apagado: true, atualizadoEm: agora() } : n === 'festas' ? { id, apagado: true, atualizadoEm: agora() } : { apagado: true, atualizadoEm: agora() });
 
   function novoNuvemId(salvoEm) {
+    if (cofreDoc && Cripto()) { const r = safe(() => Cripto().aleatorioId(), ''); if (r) return r; }   /* com cofre, o id não revela a hora */
     const base = String(salvoEm || agora()).replace(/[^0-9A-Za-z:.\-]/g, '').slice(0, 40) || agora();
     return base + '_' + Math.random().toString(36).slice(2, 6);
   }
@@ -146,6 +178,9 @@
 
   /* ---------- SDK ---------- */
   let fb = null;                 /* { auth, fs, app, db, a } depois de carregar */
+  let cofreDoc;                  /* undefined = ainda não lido; null = sem cofre; objeto = documento do cofre */
+  let chaveCofre = null;         /* { key, kid } quando destrancado neste aparelho */
+  const ehCif = (d) => ehObj(d) && d.v !== undefined;
   const online = () => safe(() => navigator.onLine !== false, true);
   const pode = () => !!(fb && E.fase === 'logado' && E.usuario && !E.decisao && meta.uid === E.usuario.uid);
   const caminho = (n) => ['usuarios', E.usuario.uid, n];
@@ -170,10 +205,26 @@
   }
 
   /* ---------- envio ---------- */
+  /* ---- cifrar/decifrar nas fronteiras (o armazenamento local nunca muda) ---- */
+  const payloadDe = (n, l) => (n === 'diario'
+    ? { texto: l.texto, clima: l.clima, photagogia: l.photagogia, criadoEm: l.criadoEm, id: l.id }
+    : { data: l.data, salvoEm: l.salvoEm, hora: l.hora, horas: l.horas, acao: l.acao });
+  const ctxDe = (n, id, d) => ({ uid: E.usuario.uid, colecao: n, id, salvoEm: n === 'diario' && ehObj(d) && typeof d.salvoEm === 'string' ? d.salvoEm : '' });
+  async function cifrarDoc(n, id, limpo) {
+    const salvoEm = n === 'diario' ? (limpo.salvoEm || '1970-01-01T00:00:00.000Z') : '';
+    const c = await Cripto().cifrar(chaveCofre, { uid: E.usuario.uid, colecao: n, id, salvoEm }, payloadDe(n, limpo));
+    return n === 'diario'
+      ? Object.assign({ data: id, salvoEm }, c, { atualizadoEm: agora() })
+      : Object.assign({ nuvemId: id }, c, { atualizadoEm: agora() });
+  }
+  const brutoDe = (n, id, d, p) => (n === 'diario' ? Object.assign({}, p, { data: id, salvoEm: d.salvoEm }) : Object.assign({}, p, { nuvemId: id }));
+
   async function montarDocs(itens) {
-    const S = store(), docs = [], concluidos = [];
+    const S = store(), docs = [], concluidos = [], adiados = [];
     for (const it of itens) {
       if (it.op === 'delete') { docs.push({ n: it.n, id: String(it.k), dados: lapide(it.n, String(it.k)), item: it }); continue; }
+      const cifra = !!cofreDoc && COLECOES_CIFRADAS.indexOf(it.n) >= 0;
+      if (cifra && !chaveCofre) { adiados.push(it); continue; }   /* cofre trancado: fica na fila até destrancar */
       let v = await S.get(it.n, it.k);
       if (!v) { concluidos.push(it); continue; }          /* sumiu localmente: nada a enviar */
       let id;
@@ -183,21 +234,24 @@
       } else id = String(it.k);
       const limpo = LIMPAR[it.n](v, id);
       if (!limpo) { concluidos.push(it); continue; }      /* inválido: não sobe (as regras também recusariam) */
-      docs.push({ n: it.n, id, dados: Object.assign({}, limpo, { atualizadoEm: agora() }), item: it });
+      docs.push({ n: it.n, id, dados: cifra ? await cifrarDoc(it.n, id, limpo) : Object.assign({}, limpo, { atualizadoEm: agora() }), item: it });
     }
-    return { docs, concluidos };
+    return { docs, concluidos, adiados };
   }
   async function gravarDocs(docs) {
-    for (let i = 0; i < docs.length; i += LOTE) {
+    const tam = cofreDoc ? LOTE_CIFRA : LOTE;
+    for (let i = 0; i < docs.length; i += tam) {
       const b = fb.fs.writeBatch(fb.db);
-      docs.slice(i, i + LOTE).forEach((d) => b.set(fb.fs.doc(fb.db, ...caminho(d.n), d.id), d.dados));
+      docs.slice(i, i + tam).forEach((d) => b.set(fb.fs.doc(fb.db, ...caminho(d.n), d.id), d.dados));
       await comTimeout(b.commit(), PRAZO_REDE);
     }
   }
   async function enviarFila() {
     if (!pode() || !online() || !fila.length) return 0;
+    if (cofreDoc === undefined) await carregarCofre();    /* sem saber se há cofre, nada de diario/diario_log sobe */
     const itens = fila.slice();
-    const { docs, concluidos } = await montarDocs(itens);
+    const { docs, concluidos, adiados } = await montarDocs(itens);
+    E.cofre.adiados = adiados.length;
     await gravarDocs(docs);
     const feitos = concluidos.concat(docs.map((d) => d.item));
     fila = fila.filter((x) => !feitos.some((f) => f.n === x.n && String(f.k) === String(x.k) && f.t === x.t));   /* o que mudou durante o envio continua na fila */
@@ -206,7 +260,7 @@
   }
 
   /* ---------- recebimento ---------- */
-  const novoCtx = () => ({ diario: [], logs: 0, festas: false, tudo: false, recebidos: 0, invalidos: 0, maxAtual: '' });
+  const novoCtx = () => ({ diario: [], logs: 0, festas: false, tudo: false, recebidos: 0, invalidos: 0, maxAtual: '', pulou: 0, falhas: [], curar: [] });
   async function aplicarRemoto(n, id, d, ctx, locais) {
     const S = store();
     if (ehObj(d) && typeof d.atualizadoEm === 'string' && d.atualizadoEm > ctx.maxAtual) ctx.maxAtual = d.atualizadoEm;
@@ -214,8 +268,17 @@
       if (n === 'festas' && locais.festas[id]) { await S.delete('festas', id, { silencioso: true }); ctx.festas = true; ctx.recebidos++; }
       return;
     }
-    const limpo = LIMPAR[n](d, id);
+    let bruto = d, claro = true;
+    if (ehCif(d)) {                                       /* documento cifrado (cofre) */
+      claro = false;
+      if (n === 'festas' || !Cripto()) { ctx.invalidos++; return; }
+      if (!chaveCofre) { ctx.pulou++; return; }           /* trancado: não consome o cursor */
+      try { bruto = brutoDe(n, id, d, await Cripto().decifrar(chaveCofre, ctxDe(n, id, d), d)); }
+      catch (e) { ctx.invalidos++; ctx.falhas.push({ n, id, codigo: (e && e.cripto) || 'corrompido' }); return; }
+    }
+    const limpo = LIMPAR[n](bruto, id);
     if (!limpo) { ctx.invalidos++; return; }
+    if (claro && cofreDoc && chaveCofre && COLECOES_CIFRADAS.indexOf(n) >= 0) ctx.curar.push({ n, id, limpo });   /* auto-cura: documento em claro depois do cofre ligado */
     if (n === 'diario') {
       const loc = locais.diario[id];
       if (!loc || String(limpo.salvoEm) > String(loc.salvoEm || '')) { await S.put('diario', limpo, { silencioso: true }); ctx.diario.push(id); ctx.recebidos++; }
@@ -243,12 +306,19 @@
     safe(() => window.dispatchEvent(new CustomEvent('calendarium:nuvem-dados', { detail: { diario: ctx.diario.slice(), logs: ctx.logs > 0, festas: ctx.festas, tudo: ctx.tudo } })));
   }
 
+  async function curarClaros(ctx) {
+    if (!ctx.curar.length || !chaveCofre || !cofreDoc) return;
+    const docs = [];
+    for (const c of ctx.curar) docs.push({ n: c.n, id: c.id, dados: await cifrarDoc(c.n, c.id, c.limpo) });
+    await gravarDocs(docs);
+  }
   async function puxarIncremental() {
-    if (!pode() || !online()) return { recebidos: 0 };
+    if (!pode() || !online()) return { recebidos: 0, falhas: [] };
     const ctx = novoCtx(), locais = await lerLocais();
     const desde = new Date(Math.max(0, Date.parse(meta.cursor) - MARGEM_RELOGIO)).toISOString();
     for (const n of COLECOES) { for (const r of await lerColecao(n, desde)) await aplicarRemoto(n, r.id, r.dados, ctx, locais); }
-    if (ctx.maxAtual && ctx.maxAtual > meta.cursor) { meta.cursor = ctx.maxAtual; gravarMeta(); }
+    await curarClaros(ctx);
+    if (ctx.maxAtual && ctx.maxAtual > meta.cursor && !ctx.pulou) { meta.cursor = ctx.maxAtual; gravarMeta(); }   /* com cifrados ilegíveis o cursor espera */
     avisarDados(ctx);
     return ctx;
   }
@@ -256,7 +326,9 @@
   async function reconciliarCompleto(enviar) {
     if (!fb || !E.usuario || !online()) throw Object.assign(new Error('offline'), { code: 'auth/network-request-failed' });
     const S = store(), ctx = novoCtx(), locais = await lerLocais(), remotos = { diario: {}, logs: {}, festas: {} };
+    const trancado = !!cofreDoc && !chaveCofre;           /* diario/diario_log só podem ser lidos/enviados com a chave */
     for (const n of COLECOES) {
+      if (trancado && COLECOES_CIFRADAS.indexOf(n) >= 0) continue;
       for (const r of await lerColecao(n, null)) {
         if (n === 'diario') remotos.diario[r.id] = r.dados; else if (n === 'festas') remotos.festas[r.id] = r.dados; else remotos.logs[r.id] = r.dados;
         await aplicarRemoto(n, r.id, r.dados, ctx, locais);
@@ -265,7 +337,7 @@
     let enviados = 0;
     if (enviar) {
       const docs = [];
-      Object.keys(locais.diario).forEach((dia) => {
+      if (!trancado) Object.keys(locais.diario).forEach((dia) => {
         const loc = limparDiario(locais.diario[dia], dia), rem = remotos.diario[dia];
         if (loc && (!rem || (rem.apagado !== true && String(loc.salvoEm) > String(rem.salvoEm || '')))) docs.push({ n: 'diario', id: dia, dados: Object.assign({}, loc, { atualizadoEm: agora() }) });
       });
@@ -273,20 +345,24 @@
         const loc = limparFesta(locais.festas[id], id);
         if (loc && !remotos.festas[id]) docs.push({ n: 'festas', id, dados: Object.assign({}, loc, { atualizadoEm: agora() }) });
       });
-      for (const r of locais.listaLogs) {
+      if (!trancado) for (const r of locais.listaLogs) {
         let v = r;
         if (!v.nuvemId) { v = Object.assign({}, v, { nuvemId: novoNuvemId(v.salvoEm) }); await S.put('diario_log', v, { silencioso: true }); }
         if (remotos.logs[v.nuvemId]) continue;
         const loc = limparLog(v, v.nuvemId);
         if (loc) docs.push({ n: 'diario_log', id: v.nuvemId, dados: Object.assign({}, loc, { atualizadoEm: agora() }) });
       }
+      if (cofreDoc) for (const d of docs) if (COLECOES_CIFRADAS.indexOf(d.n) >= 0) d.dados = await cifrarDoc(d.n, d.id, d.dados);
       await gravarDocs(docs);
       enviados = docs.length;
     }
+    await curarClaros(ctx);
     ctx.enviados = enviados;
-    meta.cursor = agora();            /* o que chegar depois tem atualizadoEm maior (a leitura incremental ainda recua 10 min, por causa de relógios) */
-    meta.enviarLocais = false;
-    gravarMeta();
+    if (!trancado) {                  /* trancado: o cursor fica vazio e a leitura completa se repete depois de destrancar */
+      meta.cursor = agora();          /* o que chegar depois tem atualizadoEm maior (a leitura incremental ainda recua 10 min, por causa de relógios) */
+      meta.enviarLocais = false;
+      gravarMeta();
+    }
     avisarDados(ctx);
     return ctx;
   }
@@ -300,13 +376,15 @@
     return serializar(async () => {
       if (!pode()) return { ok: false, erro: E.decisao ? 'Responda primeiro à pergunta pendente.' : 'Entre na conta para sincronizar.' };
       if (!online()) { E.offline = true; notificar(); return { ok: false, erro: 'Sem conexão. As alterações ficam na fila.' }; }
+      if (!manual && bloqueadoAppCheck && Date.now() - ultimaTentativa < 300000) return { ok: false, erro: MSG_APPCHECK };   /* App Check falhou: sem insistir a cada gravação */
       ultimaTentativa = Date.now();
       E.sincronizando = true; E.erro = null; notificar();
       try {
+        await carregarCofre();                /* a cada sincronização: outro aparelho pode ter ligado o cofre */
         let enviados = await enviarFila(), recebidos = 0;
-        if (meta.cursor) recebidos = (await puxarIncremental()).recebidos || 0;
-        else { const c = await reconciliarCompleto(meta.enviarLocais); recebidos = c.recebidos || 0; enviados += c.enviados || 0; }
-        E.ultimoSync = agora(); E.erro = null;
+        if (meta.cursor) { const c = await puxarIncremental(); recebidos = c.recebidos || 0; E.cofre.ilegiveis += (c.falhas || []).length; }
+        else { const c = await reconciliarCompleto(meta.enviarLocais); recebidos = c.recebidos || 0; enviados += c.enviados || 0; E.cofre.ilegiveis = (c.falhas || []).length; }
+        E.ultimoSync = agora(); E.erro = null; bloqueadoAppCheck = false;
         return { ok: true, enviados, recebidos };
       } catch (e) {
         E.erro = msgErro(e);
@@ -343,11 +421,12 @@
   function aoMudarUsuario(user) {
     if (!user) {
       if (timerEnvio) { clearTimeout(timerEnvio); timerEnvio = null; }
-      E.usuario = null; E.decisao = null; E.sincronizando = false; E.fase = fb ? 'deslogado' : E.fase;
+      E.usuario = null; E.decisao = null; E.sincronizando = false; E.fase = fb ? 'deslogado' : E.fase; resetCofre();
       lerMeta(); carregarFila(meta.uid);      /* edições feitas sem login continuam na fila da última conta */
       notificar(); return;
     }
     E.usuario = { uid: String(user.uid), email: String(user.email || '') };
+    resetCofre();
     E.fase = 'logado'; E.erro = null; notificar();
     aoEntrar();
   }
@@ -387,12 +466,13 @@
     return serializar(async () => {
       if (!fb || !E.usuario) return { ok: false, erro: 'Você não está conectado.' };
       if (pode() && online() && fila.length) {
-        try { await enviarFila(); } catch (e) { E.erro = msgErro(e); }
+        try { await carregarCofre(); await enviarFila(); } catch (e) { E.erro = msgErro(e); }
       }
       if (fila.length && !o.forcar) return { ok: false, pendentes: fila.length, erro: fila.length + ' alteração(ões) ainda não subiram para a nuvem.' };
       if (timerEnvio) { clearTimeout(timerEnvio); timerEnvio = null; }
       const uid = E.usuario.uid;
       try { await fb.a.signOut(fb.auth); } catch (e) { return { ok: false, erro: msgErro(e) }; }
+      await safe(() => Cripto().esquecerChave(uid));       /* sair sempre tranca o cofre */
       if (o.apagar) {
         const S = store();
         if (S && typeof S.clearAll === 'function') await S.clearAll();
@@ -401,6 +481,243 @@
         const ctx = novoCtx(); ctx.tudo = true; avisarDados(ctx);
       }
       return { ok: true, apagou: !!o.apagar };
+    });
+  }
+
+  /* ---------- cofre: criptografia de ponta a ponta do Diário ---------- */
+  const refCofre = () => fb.fs.doc(fb.db, ...caminho('cofre'), 'principal');
+  const lembrando = () => lsGet(LS_LEMBRAR) === '1';
+  const semConta = () => (pode() ? null : { ok: false, erro: E.decisao ? 'Responda primeiro à pergunta pendente.' : 'Entre na conta para usar a proteção do Diário.' });
+  const semRede = () => (online() ? null : { ok: false, erro: 'Sem conexão. Tente de novo quando estiver online.' });
+  function atualizarFaseCofre() {
+    const C = Cripto();
+    E.cofre.disponivel = !!(C && C.disponivel());
+    E.cofre.lembrar = lembrando();
+    E.cofre.fase = cofreDoc === undefined ? 'desconhecido' : !cofreDoc ? 'nenhum' : chaveCofre ? 'aberto' : 'trancado';
+    E.cofre.estado = cofreDoc ? cofreDoc.estado : null;
+    E.cofre.recuperacao = !!(cofreDoc && cofreDoc.recuperacao);
+  }
+  function resetCofre() {
+    cofreDoc = undefined; chaveCofre = null; preparado = null;
+    E.cofre = { fase: 'desconhecido', estado: null, recuperacao: false, lembrar: lembrando(), disponivel: !!(Cripto() && Cripto().disponivel()), progresso: null, ilegiveis: 0, adiados: 0 };
+  }
+  async function carregarCofre() {
+    if (!fb || !E.usuario) return;
+    const snap = await comTimeout(fb.fs.getDoc(refCofre()), PRAZO_REDE);
+    const d = snap && snap.exists() ? snap.data() : null;
+    if (d) {
+      const C = Cripto();
+      if (!C || !C.disponivel()) throw Object.assign(new Error('cofre/indisponivel'), { code: 'cofre/indisponivel' });
+      C.validar(d);                                       /* cofre malformado: aborta a sincronização (nada sobe) */
+    }
+    cofreDoc = d;
+    if (!d) chaveCofre = null;
+    else if (chaveCofre && chaveCofre.kid !== d.kid) chaveCofre = null;
+    if (d && !chaveCofre) chaveCofre = await Cripto().lerChave(E.usuario.uid, d.kid);
+    atualizarFaseCofre(); notificar();
+  }
+  const gravarCofreDoc = (c) => comTimeout(fb.fs.setDoc(refCofre(), Object.assign({}, c, { atualizadoEm: agora() })), PRAZO_REDE);
+  function lembrarNeste(v) {
+    lsSet(LS_LEMBRAR, v ? '1' : '0');
+    if (E.usuario) { if (v && chaveCofre) safe(() => Cripto().guardarChave(E.usuario.uid, chaveCofre)); else if (!v) safe(() => Cripto().esquecerChave(E.usuario.uid)); }
+    atualizarFaseCofre(); notificar();
+    return { ok: true };
+  }
+
+  /* 1) frase → cofre em memória (nada sobe ainda) */
+  let preparado = null;
+  function prepararCofre(frase) {
+    return serializar(async () => {
+      const bloq = semConta(); if (bloq) return bloq;
+      const C = Cripto();
+      if (!C || !C.disponivel()) return { ok: false, erro: msgErro({ code: 'cofre/indisponivel' }) };
+      try { preparado = await C.criarCofre(frase); return { ok: true, recuperacao: preparado.recuperacao }; }
+      catch (e) { return { ok: false, erro: msgErro(e) }; }
+    });
+  }
+  function cancelarCofre() { preparado = null; return { ok: true }; }
+
+  /* 2) migração: cifra o que está neste aparelho (já sincronizado), grava, CONFERE e só então marca "ativo" */
+  async function montarFonteLocal() {
+    const S = store(), fonte = [], locais = await lerLocais();
+    Object.keys(locais.diario).forEach((dia) => { const l = limparDiario(locais.diario[dia], dia); if (l) fonte.push({ n: 'diario', id: dia, limpo: l }); });
+    for (const r of locais.listaLogs) {
+      let v = r;
+      if (!v.nuvemId) { v = Object.assign({}, v, { nuvemId: novoNuvemId(v.salvoEm) }); await S.put('diario_log', v, { silencioso: true }); }
+      const l = limparLog(v, v.nuvemId);
+      if (l) fonte.push({ n: 'diario_log', id: v.nuvemId, limpo: l });
+    }
+    return fonte;
+  }
+  async function gravarCifrados(itens, total, feitosAntes) {
+    for (let i = 0; i < itens.length; i += LOTE_CIFRA) {
+      const docs = [];
+      for (const it of itens.slice(i, i + LOTE_CIFRA)) docs.push({ n: it.n, id: it.id, dados: await cifrarDoc(it.n, it.id, it.limpo) });
+      await gravarDocs(docs);
+      E.cofre.progresso = { etapa: 'cifrando', feitos: Math.min(total, feitosAntes + i + LOTE_CIFRA), total }; notificar();
+    }
+  }
+  async function verificarCifrados(fonte) {
+    const porId = {}; fonte.forEach((f) => { porId[f.n + '/' + f.id] = f; });
+    const restantes = [], vistos = {}, emClaro = {};
+    for (const n of COLECOES_CIFRADAS) {
+      for (const r of await lerColecao(n, null)) {
+        if (ehObj(r.dados) && r.dados.apagado === true) continue;
+        if (!ehCif(r.dados)) { restantes.push({ n, id: r.id, dados: r.dados }); emClaro[n + '/' + r.id] = true; continue; }
+        const f = porId[n + '/' + r.id];
+        if (!f) continue;                                 /* cifrado por outro aparelho com a mesma chave */
+        let p;
+        try { p = await Cripto().decifrar(chaveCofre, ctxDe(n, r.id, r.dados), r.dados); }
+        catch (e) { throw Object.assign(new Error('cofre/verificacao'), { code: 'cofre/verificacao' }); }
+        if (JSON.stringify(p) !== JSON.stringify(payloadDe(n, f.limpo))) throw Object.assign(new Error('cofre/verificacao'), { code: 'cofre/verificacao' });
+        vistos[n + '/' + r.id] = true;
+      }
+    }
+    for (const k of Object.keys(porId)) if (!vistos[k] && !emClaro[k]) throw Object.assign(new Error('cofre/verificacao'), { code: 'cofre/verificacao' });
+    return restantes;
+  }
+  async function migrar(prep) {
+    let c = cofreDoc;
+    if (prep) {
+      c = Object.assign({}, prep.cofre, { estado: 'migrando' });
+      await gravarCofreDoc(c);
+      cofreDoc = c; chaveCofre = prep.chave; atualizarFaseCofre(); notificar();
+    }
+    let fonte = await montarFonteLocal();
+    await gravarCifrados(fonte, fonte.length, 0);
+    let ok = false;
+    for (let t = 0; t < 4; t++) {
+      E.cofre.progresso = { etapa: 'verificando', feitos: 0, total: fonte.length }; notificar();
+      const rest = await verificarCifrados(fonte);
+      if (!rest.length) { ok = true; break; }
+      if (t === 3) break;
+      const extra = [], lap = [];                         /* apareceu algo em claro (outro aparelho antigo): cifra, ou descarta se for inválido */
+      for (const r of rest) { const limpo = LIMPAR[r.n](r.dados, r.id); if (limpo) extra.push({ n: r.n, id: r.id, limpo }); else lap.push({ n: r.n, id: r.id, dados: lapide(r.n, r.id) }); }
+      if (extra.length) { await gravarCifrados(extra, extra.length, 0); fonte = fonte.concat(extra); }
+      if (lap.length) await gravarDocs(lap);
+    }
+    if (!ok) throw Object.assign(new Error('cofre/migracao-incompleta'), { code: 'cofre/migracao-incompleta' });
+    const ativo = Cripto().mudarEstado(c, 'ativo');
+    await gravarCofreDoc(ativo);
+    cofreDoc = ativo;
+    return fonte.length;
+  }
+  async function apagarCofreNuvem() {                     /* "recomeçar": só a cópia da nuvem; o que está no aparelho não é tocado */
+    for (const n of COLECOES_CIFRADAS) {
+      const lista = await lerColecao(n, null);
+      for (let i = 0; i < lista.length; i += LOTE) {
+        const b = fb.fs.writeBatch(fb.db);
+        lista.slice(i, i + LOTE).forEach((r) => b.delete(fb.fs.doc(fb.db, ...caminho(n), r.id)));
+        await comTimeout(b.commit(), PRAZO_REDE);
+      }
+    }
+    await comTimeout(fb.fs.deleteDoc(refCofre()), PRAZO_REDE);
+    cofreDoc = null; chaveCofre = null;
+  }
+  /* opcoes: { recomecar:true } descarta a cópia da nuvem (frase e chave perdidas) e recria o cofre a partir deste aparelho */
+  function ativarCofre(opcoes) {
+    const op = ehObj(opcoes) ? opcoes : {};
+    return serializar(async () => {
+      const bloq = semConta() || semRede(); if (bloq) return bloq;
+      E.erro = null; E.sincronizando = true; E.cofre.progresso = { etapa: 'preparando', feitos: 0, total: 0 }; notificar();
+      try {
+        await carregarCofre();
+        const retomando = !op.recomecar && !!cofreDoc && cofreDoc.estado === 'migrando' && !!chaveCofre;
+        if (cofreDoc && !retomando && !op.recomecar) return { ok: false, erro: cofreDoc.estado === 'migrando' ? 'Destranque o cofre com a frase para continuar a proteção.' : 'A proteção já está ligada nesta conta.' };
+        if (!retomando && !preparado) return { ok: false, erro: 'Defina a frase primeiro.' };
+        if (op.recomecar) { const antes = await contarLocais(); if (!((antes.diario || 0) + (antes.diario_log || 0))) return { ok: false, erro: 'Este aparelho não tem dados do Diário para recriar o cofre.' }; await apagarCofreNuvem(); }
+        else if (!retomando) {                            /* como hoje: sincroniza em claro para o aparelho ter a versão mais recente */
+          await enviarFila();
+          if (meta.cursor) await puxarIncremental(); else await reconciliarCompleto(meta.enviarLocais);
+        }
+        const n = await migrar(retomando ? null : preparado);
+        preparado = null;
+        if (lembrando()) await Cripto().guardarChave(E.usuario.uid, chaveCofre);
+        E.ultimoSync = agora();
+        return { ok: true, protegidos: n };
+      } catch (e) { E.erro = msgErro(e); return { ok: false, erro: E.erro, retomavel: !!cofreDoc }; }
+      finally { E.sincronizando = false; E.cofre.progresso = null; atualizarFaseCofre(); notificar(); }
+    });
+  }
+
+  /* destrancar */
+  function abrirCofre(frase) {
+    return serializar(async () => {
+      const bloq = semConta() || semRede(); if (bloq) return bloq;
+      try {
+        await carregarCofre();
+        if (!cofreDoc) return { ok: false, erro: msgErro({ code: 'cofre/inexistente' }) };
+        chaveCofre = await Cripto().abrir(cofreDoc, frase);
+        if (lembrando()) await Cripto().guardarChave(E.usuario.uid, chaveCofre);
+        atualizarFaseCofre(); notificar();
+        return { ok: true };
+      } catch (e) { return { ok: false, erro: msgErro(e) }; }
+    }).then((r) => (r.ok ? sincronizar(true).then((s) => ({ ok: true, sync: s })) : r));
+  }
+  async function mudarCofreTx(fn) {                       /* troca de frase: em transação, com rev + 1 (duas trocas simultâneas não se sobrepõem) */
+    let novo = null, chave = null;
+    await comTimeout(fb.fs.runTransaction(fb.db, async (tx) => {
+      const snap = await tx.get(refCofre());
+      if (!snap.exists()) throw Object.assign(new Error('cofre/inexistente'), { code: 'cofre/inexistente' });
+      const atual = snap.data(); Cripto().validar(atual);
+      const r = await fn(atual);
+      tx.set(refCofre(), Object.assign({}, r.cofre, { atualizadoEm: agora() }));
+      novo = r.cofre; chave = r.chave;
+    }), PRAZO_REDE * 3);
+    cofreDoc = novo; chaveCofre = chave;
+    if (lembrando()) await Cripto().guardarChave(E.usuario.uid, chave);
+    atualizarFaseCofre(); notificar();
+  }
+  function trocarFrase(atual, nova) {
+    return serializar(async () => {
+      const bloq = semConta() || semRede(); if (bloq) return bloq;
+      try { await carregarCofre(); if (!cofreDoc) return { ok: false, erro: msgErro({ code: 'cofre/inexistente' }) }; await mudarCofreTx((c) => Cripto().trocarFrase(c, atual, nova)); return { ok: true }; }
+      catch (e) { return { ok: false, erro: msgErro(e) }; }
+    });
+  }
+  function abrirComRecuperacao(codigo, nova) {
+    return serializar(async () => {
+      const bloq = semConta() || semRede(); if (bloq) return bloq;
+      try { await carregarCofre(); if (!cofreDoc) return { ok: false, erro: msgErro({ code: 'cofre/inexistente' }) }; await mudarCofreTx((c) => Cripto().redefinirComRecuperacao(c, codigo, nova)); return { ok: true }; }
+      catch (e) { return { ok: false, erro: msgErro(e) }; }
+    }).then((r) => (r.ok ? sincronizar(true).then((s) => ({ ok: true, sync: s })) : r));
+  }
+  function trancar() {
+    return serializar(async () => {
+      chaveCofre = null;
+      if (E.usuario) await Cripto().esquecerChave(E.usuario.uid);
+      atualizarFaseCofre(); notificar();
+      return { ok: true };
+    });
+  }
+  /* desligar: decifra tudo, regrava em claro, confere e só então remove o cofre */
+  function desativarCofre() {
+    return serializar(async () => {
+      const bloq = semConta() || semRede(); if (bloq) return bloq;
+      E.sincronizando = true; E.erro = null; notificar();
+      try {
+        await carregarCofre();
+        if (!cofreDoc) return { ok: false, erro: 'A proteção já está desligada.' };
+        if (!chaveCofre) return { ok: false, erro: 'Destranque o cofre com a frase primeiro.' };
+        const planos = [];
+        for (const n of COLECOES_CIFRADAS) for (const r of await lerColecao(n, null)) {
+          if (!ehCif(r.dados)) continue;
+          const bruto = brutoDe(n, r.id, r.dados, await Cripto().decifrar(chaveCofre, ctxDe(n, r.id, r.dados), r.dados));   /* qualquer falha aborta tudo */
+          const limpo = LIMPAR[n](bruto, r.id);
+          if (!limpo) throw Object.assign(new Error('cofre/corrompido'), { code: 'cofre/corrompido' });
+          planos.push({ n, id: r.id, dados: Object.assign({}, limpo, { atualizadoEm: agora() }) });
+        }
+        const cofreAntes = cofreDoc; cofreDoc = null;     /* gravarDocs volta ao tamanho de lote normal */
+        try { await gravarDocs(planos); } catch (e) { cofreDoc = cofreAntes; throw e; }
+        const ainda = [];
+        for (const n of COLECOES_CIFRADAS) for (const r of await lerColecao(n, null)) if (ehCif(r.dados)) ainda.push(n + '/' + r.id);
+        if (ainda.length) { cofreDoc = cofreAntes; throw Object.assign(new Error('cofre/verificacao'), { code: 'cofre/verificacao' }); }
+        await comTimeout(fb.fs.deleteDoc(refCofre()), PRAZO_REDE);
+        chaveCofre = null;
+        await Cripto().esquecerChave(E.usuario.uid);
+        return { ok: true, desfeitos: planos.length };
+      } catch (e) { E.erro = msgErro(e); return { ok: false, erro: E.erro }; }
+      finally { E.sincronizando = false; atualizarFaseCofre(); notificar(); }
     });
   }
 
@@ -438,9 +755,32 @@
   function configValida(c) {
     return ehObj(c) && ['apiKey', 'authDomain', 'projectId', 'appId'].every((k) => typeof c[k] === 'string' && c[k].length > 5 && !/COLE|SEU_|YOUR_/i.test(c[k]));
   }
+  /* App Check (opcional): chave PÚBLICA do reCAPTCHA em firebase-config.js; a chave secreta fica só no console do Firebase */
+  const chaveAppCheck = () => (typeof window.FIREBASE_APPCHECK_CHAVE === 'string' && window.FIREBASE_APPCHECK_CHAVE.length > 10 && !/COLE|SEU_|YOUR_/i.test(window.FIREBASE_APPCHECK_CHAVE) ? window.FIREBASE_APPCHECK_CHAVE : '');
+  async function carregarAppCheck() {                     /* nunca lança: sem o módulo, Auth e Firestore seguem sem token */
+    if (!chaveAppCheck()) { E.appCheck = 'desligado'; return null; }
+    try { return await comTimeout(import(BASE + 'firebase-app-check.js'), PRAZO_REDE); }
+    catch (e) { E.appCheck = 'falhou'; return null; }
+  }
+  function iniciarAppCheck(app, mod) {                    /* precisa rodar antes de Auth e Firestore */
+    if (!mod) return;
+    try {
+      const prov = window.FIREBASE_APPCHECK_PROVEDOR === 'enterprise' ? new mod.ReCaptchaEnterpriseProvider(chaveAppCheck()) : new mod.ReCaptchaV3Provider(chaveAppCheck());
+      const ac = mod.initializeAppCheck(app, { provider: prov, isTokenAutoRefreshEnabled: true });
+      E.appCheck = 'ativo';
+      safe(() => Promise.resolve(mod.getToken(ac, false)).catch(() => { E.appCheck = 'falhou'; notificar(); }));   /* checagem que não bloqueia nada */
+    } catch (e) { E.appCheck = 'falhou'; }
+  }
   async function carregarSdk() {
-    const [app, auth, fs] = await Promise.all([import(BASE + 'firebase-app.js'), import(BASE + 'firebase-auth.js'), import(BASE + 'firebase-firestore.js')]);
+    const teste = window.FIREBASE_SDK_TESTE;              /* só os testes definem isto (SDK falso, sem rede) */
+    let app, auth, fs, ac = null;
+    if (teste) { app = teste.app; auth = teste.auth; fs = teste.firestore; ac = chaveAppCheck() ? (teste.appCheck || null) : null; }
+    else {
+      [app, auth, fs] = await Promise.all([import(BASE + 'firebase-app.js'), import(BASE + 'firebase-auth.js'), import(BASE + 'firebase-firestore.js')]);
+      ac = await carregarAppCheck();
+    }
     const a = app.initializeApp(window.FIREBASE_CONFIG);
+    iniciarAppCheck(a, ac);
     let au;
     try { au = auth.initializeAuth(a, { persistence: [auth.indexedDBLocalPersistence, auth.browserLocalPersistence, auth.inMemoryPersistence], popupRedirectResolver: auth.browserPopupRedirectResolver }); }
     catch (e) { au = auth.getAuth(a); }
@@ -455,7 +795,8 @@
     } catch (e) { E.fase = 'indisponivel'; E.erro = 'Não foi possível carregar o login (sem internet?). O diário segue funcionando só neste aparelho.'; notificar(); }
   }
 
-  const api = { disponivel: false, versaoSdk: VERSAO_SDK, estado: copiaEstado, onEstado, entrarEmail, entrarGoogle, recuperarSenha, sair, sincronizar: () => sincronizar(true), decidir };
+  const api = { disponivel: false, versaoSdk: VERSAO_SDK, estado: copiaEstado, onEstado, entrarEmail, entrarGoogle, recuperarSenha, sair, sincronizar: () => sincronizar(true), decidir,
+    prepararCofre, cancelarCofre, ativarCofre, abrirCofre, abrirComRecuperacao, trancar, trocarFrase, desativarCofre, lembrarNeste };
   window.CalendariumNuvem = api;
 
   E.offline = !online();

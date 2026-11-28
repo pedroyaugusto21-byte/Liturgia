@@ -16,7 +16,14 @@ const ZODIAC = [['♈','Áries'],['♉','Touro'],['♊','Gêmeos'],['♋','Cânc
   .map(([s, n]) => ({ sym: s + '\uFE0E', name: n }));
 const ROMAN = ['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'];
 const PHASES = ['Lua Nova','Crescente','Quarto Crescente','Crescente Gibosa','Lua Cheia','Minguante Gibosa','Quarto Minguante','Minguante'];
-const SEASONS = ['Outono','Inverno','Primavera','Verão'];
+/* Hemisfério (etapa B): a roda é astronômica (o mês I começa no equinócio de março) e as datas das festas não mudam;
+   o que muda é o NOME da estação de cada trimestre. Padrão: 'sul' (comportamento original). */
+const SEASONS_HEMI = { sul: ['Outono', 'Inverno', 'Primavera', 'Verão'], norte: ['Primavera', 'Verão', 'Outono', 'Inverno'] };
+const HEMI_KEY = 'calendarium.hemisferio';
+const ehHemi = (v) => v === 'sul' || v === 'norte';
+function lerHemi() { try { const v = window.localStorage.getItem(HEMI_KEY); return ehHemi(v) ? v : 'sul'; } catch (e) { return 'sul'; } }
+let hemi = lerHemi();
+const seasons = () => SEASONS_HEMI[hemi];
 const ORDINALS = ['Primeiro','Segundo','Terceiro'];
 const ZODIAC_OFFSET = 45;
 const SYMBOL_FONT = "'Noto Sans Symbols','Noto Sans Symbols 2',serif";
@@ -25,21 +32,21 @@ const HOUR_MS = 3600000, DAY_MS = 86400000;
 
 const ICONS = { 1:'wheat', 2:'bouquet', 4:'moonCircle', 5:'snowflake', 7:'flower', 8:'flowerBouquet', 10:'sun', 11:'sickle' };
 const FESTIVALS = {
-  1: { name: 'Mistérios Menores', date: 'Equinócio de Março', theme: 'Adônis (🝖) morre, Afrodite (♀) se lamenta; Zeus (♃) fulmina Semele (Σ)  e Hades (🝁)  sequestra Koré (🜟); nesta data e época, o Iniciado contempla os Símbolos Mistéricos, ele vaga como uma Alma no Hades, e contempla os mortos nos Campos dos Afódelos, a imagem de Dioníso (𐃹) é coberta com um manto preto, e o iniciado passa por provações e ordálios; ele é um Titã Punido, um Deus despedaçado, um Amante assassinado.' },
+  1: { name: 'Mistérios Menores', date: 'Equinócio de Março', theme: 'Adônis (🝖) morre, Afrodite (♀) se lamenta; Zeus (♃) fulmina Semele (Σ) e Hades (🝁) sequestra Koré (🜟); nesta data e época, o Iniciado contempla os Símbolos Mistéricos, ele vaga como uma Alma no Hades, e contempla os mortos nos Campos dos Asfódelos, a imagem de Dioniso (𐃹) é coberta com um manto preto, e o iniciado passa por provações e ordálios; ele é um Titã Punido, um Deus despedaçado, um Amante assassinado.' },
 
-  2: { name: 'Terceira Colheita', date: '1º de Maio', theme: 'Hades (🝁) se casa com Koré (🜟), Deméter (⚳) chora de luto e se lamenta; nesta data o Iniciado celebra em seu Lar (⚻) a consagração de seus objetos místicos, ele celebra o Hiero Gamos de Hades e Koré , agora Perséfone , a Mãe de Todos nós! Também choramos o Luto de Deméter  e Jejuamos com a Deusa em seu sofrimento. Na Terceira Colheita reconhecemos as forças desagregadoras do Cosmo.' },
+  2: { name: 'Terceira Colheita', date: '1º de Maio', theme: 'Hades (🝁) se casa com Koré (🜟), Deméter (⚳) chora de luto e se lamenta; nesta data o Iniciado celebra em seu Lar (⚻) a consagração de seus objetos místicos, ele celebra o Hiero Gamos de Hades e Koré, agora Perséfone, a Mãe de Todos nós! Também choramos o Luto de Deméter e Jejuamos com a Deusa em seu sofrimento. Na Terceira Colheita reconhecemos as forças desagregadoras do Cosmo.' },
 
   4: { name: 'Banquete dos Mortos', date: 'Solstício de Junho', theme: 'Deméter (⚳) sofre e faz a Terra (⊕) sofrer; Zeus (♃) costura Baco na coxa, Perséfone (🜟) se une à Adônis(🝖) no submundo; nesta data o iniciado celebra com sua família o Banquete dos Mortos; neste banquete ele honra seus antepassados, os ancestrais e mortos de sua família; e chora e lamenta os sofrimentos de Deméter mas celebra a união da Donzela e do Rapaz ínfero; é nesta celebração que o iniciado reconhece a si mesmo como um morto, e despedece-se de si.'},
 
-  5: { name: 'Candelária', date: '1º de Agosto', theme: 'Deméter (⚳) e Hécate (Ⱛ) saem em busca de Perséfone (🜟) , Kuretes e Koribantes (ꗣ) dançam sua dança protetora; nesta data acendemos luzes para trazer as bençãos da Luz que logo retornará; pois tais luzes são as tochas de Hécate que guia Deo em busca de sua filha, é um tempo de oráculos e celebrações locais, familiares e de caridade; Os mistérios dos Cabiros, Curetes e Koribantes são lembrados nesta data, bem como os Mistérios de Afrodite e seu Nascimento do Falo decepado de Urano (♅), por Cronos (♄).'}, 
+  5: { name: 'Candelária', date: '1º de Agosto', theme: 'Deméter (⚳) e Hécate (Ⱛ) saem em busca de Perséfone (🜟), Kuretes e Koribantes (ꗣ) dançam sua dança protetora; nesta data acendemos luzes para trazer as bênçãos da Luz que logo retornará; pois tais luzes são as tochas de Hécate que guia Deo em busca de sua filha, é um tempo de oráculos e celebrações locais, familiares e de caridade; Os mistérios dos Cabiros, Curetes e Koribantes são lembrados nesta data, bem como os Mistérios de Afrodite e seu Nascimento do Falo decepado de Urano (♅), por Cronos (♄).'}, 
 
   7: { name: 'Mistérios Maiores', date: 'Equinócio de Setembro', theme: 'Perséfone (🜟) retorna à Deo (⚳) trazida por Hermes (☿) e Hécate (Ⱛ); Adônis (🝖) retorna para o leito de Afrodite (♀); nesta data o Iniciado passa pela sua segunda iniciação: após ter participado do rito como Titã, agora ele o participa como Baco: ele ressurge das cinzas, ele renasce do Fogo. Como Perséfone que retorna do Hades, como Adônis para os braços da Citeréia, o iniciado é celebrado como "Duas vezes abençoado".'},
 
-  8: { name: 'Florália', date: '1º de Novembro', theme: 'Afrodite (♀) e Adônis (🝖) celebram, Zeus  se une a Perséfone para gerar Zagreus; nesta data o iniciado celebra a vitalidade da Natureza; celebra as bodas de Perséfone e Zeus e a geração inefável de Zagreus; celebra a união flórea de Afrodite e Adônis e a vida que retorna ao Cosmos; a plantação de um Jardim de Adônis é sugerida como ato votivo do recém iniciado.'},
+  8: { name: 'Florália', date: '1º de Novembro', theme: 'Afrodite (♀) e Adônis (🝖) celebram, Zeus se une a Perséfone para gerar Zagreus; nesta data o iniciado celebra a vitalidade da Natureza; celebra as bodas de Perséfone e Zeus e a geração inefável de Zagreus; celebra a união flórea de Afrodite e Adônis e a vida que retorna ao Cosmos; a plantação de um Jardim de Adônis é sugerida como ato votivo do recém-iniciado.'},
 
-  10: { name: 'Banquete dos Vivos', date: 'Solstício de Dezembro', theme: 'Hélios Rei (⊙), Baco nasce da Virgem e é coroado Rei dos Deuses, Dionísos retorna triunfante das suas conquistas militares; nesta data o Iniciado celebra o Banquete dos Vivos; ele celebra o nascimento de Baco, celebra seu retorno e triúnfo; celebra os Mistérios da Vida; é coroado como oficiante dos ritos. Um pão e vinho são celebrados, uma segunda Comunhão, dessa vez em Vida e Liberdade.'},
+  10: { name: 'Banquete dos Vivos', date: 'Solstício de Dezembro', theme: 'Hélios Rei (⊙), Baco nasce da Virgem e é coroado Rei dos Deuses, Dioniso retorna triunfante das suas conquistas militares; nesta data o Iniciado celebra o Banquete dos Vivos; ele celebra o nascimento de Baco, celebra seu retorno e triúnfo; celebra os Mistérios da Vida; é coroado como oficiante dos ritos. Um pão e vinho são celebrados, uma segunda Comunhão, dessa vez em Vida e Liberdade.'},
 
- 11: { name: 'Primeira Colheita', date: '1º de Fevereiro', theme: 'Os Titãs (⊖) iludem e despedaçam Iacco (𐃹), o Zagreus, Dioníso dos Mistérios, cozinham seus membors e o assam ritualmente, O Coração é salvo por Pallas Athena (⚴) e entregue à Zeus (♃), que o dá à Sêmele (Σ); seus membros são reunídos por Apollo (⛢) e Rheia-Deméter (🜪); nesta data começa a Jornada do Iniciado, é o primeiro dos ritos dos Mistérios; o devoto que irá se iniciar participa de seu Batismo e Primeira Comunhão, como Titã, ele despedaça o Deus e reconhece em si o Cosmo criado pelo Ódio e pela Discórdia! Nesta etapa, o buscador deve buscar dentro de si reconhecer os seus hábitos titânicos e começar uma vida órfica: uma vida de restrições e purificações, abstendo-se da fúria, do ódio e dos demais vícios...' },
+ 11: { name: 'Primeira Colheita', date: '1º de Fevereiro', theme: 'Os Titãs (⊖) iludem e despedaçam Iacco (𐃹), o Zagreus, Dioniso dos Mistérios, cozinham seus membors e o assam ritualmente, O Coração é salvo por Pallas Athena (⚴) e entregue à Zeus (♃), que o dá à Sêmele (Σ); seus membros são reunídos por Apollo (⛢) e Rheia-Deméter (🜪); nesta data começa a Jornada do Iniciado, é o primeiro dos ritos dos Mistérios; o devoto que irá se iniciar participa de seu Batismo e Primeira Comunhão, como Titã, ele despedaça o Deus e reconhece em si o Cosmo criado pelo Ódio e pela Discórdia! Nesta etapa, o buscador deve buscar dentro de si reconhecer os seus hábitos titânicos e começar uma vida órfica: uma vida de restrições e purificações, abstendo-se da fúria, do ódio e dos demais vícios...' },
 };
 
 
@@ -79,8 +86,54 @@ function newMoonJD(k) {
     + 0.00208 * Math.sin(2 * M) - 0.00111 * Math.sin(Mp - 2 * F) - 0.00057 * Math.sin(Mp + 2 * F)
     + 0.00056 * Math.sin(2 * Mp + M) - 0.00042 * Math.sin(3 * Mp);
 }
-const monthName = (i) => `${ORDINALS[i % 3]} d/ ${SEASONS[Math.floor(i / 3)]}`;
-const litDay = (ms) => Math.floor((ms - new Date(ms).getTimezoneOffset() * 60000 - DAWN * HOUR_MS) / DAY_MS);
+const monthName = (i) => `${ORDINALS[i % 3]} da ${seasons()[Math.floor(i / 3)]}`;
+/* Rótulo da data da festa. Equinócios e solstícios (1, 4, 7, 10) ganham a estação do hemisfério escolhido quando é o Norte
+   ("Equinócio de Março · primavera"); no Sul o texto é o original. Festas de 1º do mês não dependem do hemisfério. */
+const FEST_ASTRO = [1, 4, 7, 10];
+function festData(k) {
+  const f = FESTIVALS[k];
+  return hemi === 'norte' && FEST_ASTRO.indexOf(k) >= 0 ? `${f.date} · ${seasons()[Math.floor(k / 3)].toLowerCase()}` : f.date;
+}
+/* ---------- amanhecer do dia litúrgico (etapa A) ----------
+   DAWN (06:00) é o PADRÃO: vale sem localização, se a pessoa negar, e nos dias em que o Sol não nasce
+   (noite polar) ou não se põe (Sol da meia-noite) no local. Com localização, o dia litúrgico começa no
+   nascer do Sol real (OuranosCalc.sunriseNear, mesmas fórmulas do Mapa Astral). A localização vem da
+   geolocalização que o ouranos.js já usa (eventos calendarium:localizacao[-erro]) e fica só em memória.
+   "c" = número do dia civil local (dias desde 1970 da data local, como em civilOfLitDay). */
+const AMANHECER_MAX = 800;
+const aMemo = new Map();                    /* c -> { h, padrao, motivo } */
+let aLoc = null;                            /* { lat, lon } ou null */
+let aEstado = 'padrao';                     /* 'padrao' | 'pedindo' | 'negado' | 'indisponivel' | 'ok' */
+function amanhecerDoDia(c) {
+  let r = aMemo.get(c);
+  if (r) return r;
+  r = { h: DAWN, padrao: true, motivo: aLoc ? '' : 'sem-local' };
+  const calc = window.OuranosCalc;
+  if (aLoc && calc && typeof calc.sunriseNear === 'function') {
+    const ds = civilOfLitDay(c);
+    if (ds) {
+      const ref = new Date(+ds.slice(0, 4), +ds.slice(5, 7) - 1, +ds.slice(8, 10), DAWN, 0, 0).getTime();
+      let sol = null;
+      try { sol = calc.sunriseNear(ref, aLoc.lat, aLoc.lon); } catch (e) { sol = null; }
+      if (sol && sol.ms != null) {
+        const dt = new Date(sol.ms), lm = sol.ms - dt.getTimezoneOffset() * 60000;
+        const h = dt.getHours() + dt.getMinutes() / 60 + dt.getSeconds() / 3600;
+        /* o nascer tem de cair neste dia civil, antes do meio-dia: garante dias litúrgicos sempre positivos
+           (se o fuso do aparelho destoa muito do local, volta ao padrão em vez de embaralhar o calendário) */
+        if (Math.floor(lm / DAY_MS) === c && h >= 0 && h < 12) r = { h, padrao: false, motivo: 'sol' };
+        else r.motivo = 'fuso';
+      } else if (sol) r.motivo = sol.polar === 'dia' ? 'sol-da-meia-noite' : 'noite-polar';
+    }
+  }
+  if (aMemo.size >= AMANHECER_MAX) aMemo.clear();
+  aMemo.set(c, r);
+  return r;
+}
+function litDay(ms) {
+  const lm = ms - new Date(ms).getTimezoneOffset() * 60000;
+  const c = Math.floor(lm / DAY_MS);
+  return lm >= c * DAY_MS + amanhecerDoDia(c).h * HOUR_MS ? c : c - 1;
+}
 const jdToMs = (jd) => (jd - 2440587.5) * DAY_MS;
 const monthStartDay = (k) => litDay(jdToMs(newMoonJD(k))) + 1;
 
@@ -112,9 +165,16 @@ function festasMarks(s) {
 function getState(now) {
   const ms = now.getTime();
   const hours = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
-  const period = hours >= 6 && hours < 12 ? 'Amanhecer (🜢)' : hours >= 12 && hours < 18 ? 'Entardecer (🜬)' : 'Noite (✧)';
-  const litFrac = ((hours - DAWN + 24) % 24) / 24;
-  const weekIndex = new Date(ms - DAWN * HOUR_MS).getDay();
+  const lm = ms - now.getTimezoneOffset() * 60000;
+  const dawnHoje = amanhecerDoDia(Math.floor(lm / DAY_MS));
+  const period = hours >= dawnHoje.h && hours < 12 ? 'Amanhecer (🜢)' : hours >= 12 && hours < 18 ? 'Entardecer (🜬)' : 'Noite (✧)';
+  const L = litDay(ms);
+  const dL = amanhecerDoDia(L), dN = amanhecerDoDia(L + 1);
+  /* sem amanhecer real nos dois extremos do dia litúrgico: fórmulas originais, resultado idêntico ao de antes */
+  const padrao = dL.padrao && dN.padrao;
+  const iniL = L * DAY_MS + dL.h * HOUR_MS, iniN = (L + 1) * DAY_MS + dN.h * HOUR_MS;
+  const litFrac = padrao ? ((hours - DAWN + 24) % 24) / 24 : (lm - iniL) / (iniN - iniL);
+  const weekIndex = padrao ? new Date(ms - DAWN * HOUR_MS).getDay() : new Date(L * DAY_MS).getUTCDay();
   const SYN = 29.530588853;
   const jdNow = ms / DAY_MS + 2440587.5;
   let k0 = Math.floor((jdNow - 2451550.09765) / SYN);
@@ -124,7 +184,6 @@ function getState(now) {
   const age = jdNow - nm0;
   const frac = age / (nm1 - nm0);
   const phaseName = PHASES[Math.floor(frac * 8 + 0.5) % 8];
-  const L = litDay(ms);
   let k = k0;
   while (monthStartDay(k + 1) <= L) k++;
   while (monthStartDay(k) > L) k--;
@@ -139,7 +198,7 @@ function getState(now) {
   const signIndex = Math.floor(lambda / 30);
   const moonProgress = (moonIndex + litFrac) / moonDays;
   return {
-    hours, period, weekIndex, moonIndex, moonDays, moonStartDay: startDay, phaseName, age, month, signIndex,
+    hours, period, dawnH: dawnHoje.h, dawnPadrao: dawnHoje.padrao, dawnMotivo: dawnHoje.motivo, weekIndex, moonIndex, moonDays, moonStartDay: startDay, phaseName, age, month, signIndex,
     dayAngle: 180 + hours * 15,
     weekAngle: ((weekIndex + litFrac) / 7) * 360,
     moonAngle: moonProgress * 360,
@@ -179,10 +238,11 @@ function iconInline(type, size, color) {
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${ICON_PATHS[type]}</svg>`;
 }
 
-function dayCore(r, period, idSuffix = '') {
+function dayCore(r, period, idSuffix = '', dawnH = DAWN) {
+  const da = 180 + dawnH * 15;                /* ângulo do amanhecer no mostrador (06:00 = 270°, como antes) */
   let g = `<defs><linearGradient id="dawn${idSuffix}" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#3b3552"/><stop offset="1" stop-color="#c99a6b"/></linearGradient><linearGradient id="dusk${idSuffix}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#b8776a"/><stop offset="1" stop-color="#3f2c46"/></linearGradient></defs>`;
-  g += `<path d="${sector(0, r, 90, 270)}" fill="#0f1830"/>`;
-  g += `<path d="${sector(0, r, 270, 360)}" fill="url(#dawn${idSuffix})" opacity="0.85"/>`;
+  g += `<path d="${sector(0, r, 90, da)}" fill="#0f1830"/>`;
+  g += `<path d="${sector(0, r, da, 360)}" fill="url(#dawn${idSuffix})" opacity="0.85"/>`;
   g += `<path d="${sector(0, r, 0, 90)}" fill="url(#dusk${idSuffix})" opacity="0.85"/>`;
   for (let h = 0; h < 24; h++) {
     const a = 180 + h * 15;
@@ -193,7 +253,7 @@ function dayCore(r, period, idSuffix = '') {
     const [x, y] = polar(rr, a);
     g += `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="central" font-size="9" letter-spacing="1" fill="#efe6d2" opacity="${period === lab ? 1 : 0.55}" style="font-family:'Jost',sans-serif;text-transform:uppercase">${lab}</text>`;
   });
-  const [dx1, dy1] = polar(r - 20, 270), [dx2, dy2] = polar(r, 270);
+  const [dx1, dy1] = polar(r - 20, da), [dx2, dy2] = polar(r, da);
   g += `<line x1="${dx1}" y1="${dy1}" x2="${dx2}" y2="${dy2}" stroke="#f3d08a" stroke-width="3" stroke-linecap="round"/>`;
   g += `<circle cx="500" cy="500" r="${r}" fill="none" stroke="rgba(201,164,92,0.85)" stroke-width="1.5"/>`;
   return g;
@@ -222,7 +282,7 @@ function seasonRing(r1, r2, active) {
   return ring(r1, r2, 12, 0, active, (i, x, y, on) => {
     const f = FESTIVALS[i];
     return f
-      ? iconSVG(ICONS[i], x, y, 32, on ? '#f3d08a' : '#e8dcc0', `${f.name} — ${f.date}\n${f.theme}`)
+      ? iconSVG(ICONS[i], x, y, 32, on ? '#f3d08a' : '#e8dcc0', `${f.name} — ${festData(i)}\n${f.theme}`)
       : `<circle cx="${x}" cy="${y}" r="2" fill="#c9a45c" opacity="0.5"/>`;
   });
 }
@@ -251,7 +311,7 @@ function buildSVG(s) {
   g += monthRing(230, 282, s.month);
   g += moonRing(170, 230, s.moonDays, s.moonIndex, festasMarks(s));
   g += weekRing(110, 170, s.weekIndex);
-  g += dayCore(110, s.period);
+  g += dayCore(110, s.period, '', s.dawnH);
   g += hand(s.weekAngle, 110, 158, '#efe6d2');
   g += hand(s.moonAngle, 170, 214, '#b9c6db');
   g += hand(s.monthAngle, 230, 268, '#e0906a');
@@ -272,7 +332,7 @@ function buildMystSVG(s) {
   g += monthRing(230, 282, s.month);
   g += moonRing(170, 230, s.moonDays, s.moonIndex);
   g += weekRing(110, 170, s.weekIndex);
-  g += dayCore(110, s.period);
+  g += dayCore(110, s.period, '', s.dawnH);
   return `<svg viewBox="40 40 920 920" class="clock" xmlns="http://www.w3.org/2000/svg">${g}</svg>`;
 }
 function buildMystList() {
@@ -280,13 +340,26 @@ function buildMystList() {
   return order.map((k) => {
     const f = FESTIVALS[k];
     const icon = iconInline(ICONS[k], 28, '#c9a45c');
-    return `<div class="myst-item"><div class="myst-icon">${icon}</div><div class="myst-text"><h3>${f.name} <span class="myst-date">· ${f.date}</span></h3><p>${f.theme}</p></div></div>`;
+    return `<div class="myst-item"><div class="myst-icon">${icon}</div><div class="myst-text"><h3>${f.name} <span class="myst-date">· ${festData(k)}</span></h3><p>${f.theme}</p></div></div>`;
   }).join('');
 }
 
+const fmtHM = (h) => { const t = Math.round(h * 60); return pad(Math.floor(t / 60) % 24) + ':' + pad(t % 60); };
+function dawnDetalhe(s) {
+  if (!s.dawnPadrao) return 'Nascer do Sol no seu local';
+  const m = s.dawnMotivo;
+  if (m === 'noite-polar') return 'Padrão · o Sol não nasce hoje neste local';
+  if (m === 'sol-da-meia-noite') return 'Padrão · o Sol não se põe hoje neste local';
+  if (m === 'fuso') return 'Padrão · nascer incompatível com o fuso do aparelho';
+  if (aEstado === 'negado') return 'Padrão · localização não autorizada';
+  if (aEstado === 'pedindo') return 'Padrão · obtendo localização…';
+  if (aEstado === 'indisponivel') return 'Padrão · localização indisponível';
+  return 'Padrão · sem localização';
+}
 function buildInfo(s, now) {
   const rows = [
     ['#f3d08a', 'Hora', now.toLocaleTimeString('pt-BR'), s.period],
+    ['#f3d08a', 'Amanhecer', fmtHM(s.dawnH), escF(dawnDetalhe(s))],
     ['#efe6d2', 'Dia', WEEK[s.weekIndex].name, WEEK[s.weekIndex].sym + ' ' + WEEK[s.weekIndex].astro],
     ['#b9c6db', 'Lua', s.phaseName, `Dia ${s.moonIndex + 1} de ${s.moonDays}`],
     ['#e0906a', 'Mês', monthName(s.month), `Mês ${ROMAN[s.month]}`],
@@ -379,6 +452,107 @@ function mystLocalRender() {
   });
 })();
 
+/* ---------- amanhecer real: localização, botão e mensagens (etapa A) ---------- */
+const MSG_AMANHECER = {
+  ok: 'Amanhecer calculado pelo nascer do Sol no seu local.',
+  pedindo: 'Obtendo a localização…',
+  negado: 'Localização não autorizada: o dia litúrgico segue começando às 06:00. Para usar o nascer do Sol, libere a localização nas configurações do navegador.',
+  indisponivel: 'Não foi possível obter a localização agora: o dia litúrgico segue começando às 06:00.',
+};
+function atualizaControleAmanhecer() {
+  const btn = document.getElementById('btnDawnLoc'), msg = document.getElementById('dawnMsg');
+  if (btn) {
+    btn.textContent = aEstado === 'ok' ? 'Atualizar localização' : 'Usar minha localização para o amanhecer';
+    btn.setAttribute('aria-busy', aEstado === 'pedindo' ? 'true' : 'false');
+  }
+  if (msg) {
+    const t = MSG_AMANHECER[aEstado] || '';
+    if (msg.textContent !== t) msg.textContent = t;     /* região aria-live: só anuncia quando o texto muda */
+  }
+}
+function mudouAmanhecer() {
+  aMemo.clear();
+  atualizaControleAmanhecer();
+  render();
+  const myst = document.getElementById('mysteriesView');
+  if (myst && myst.style.display === 'block' && typeof window.mystRender === 'function') window.mystRender();
+  try { document.dispatchEvent(new CustomEvent('calendarium:amanhecer-mudou')); } catch (e) { /* ignora */ }
+}
+function definirLocal(lat, lon) {
+  lat = Number(lat); lon = Number(lon);
+  if (!isFinite(lat) || !isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return false;
+  aLoc = { lat, lon }; aEstado = 'ok';
+  mudouAmanhecer();
+  return true;
+}
+function limparLocal(estado) {
+  aLoc = null; aEstado = estado || 'padrao';
+  mudouAmanhecer();
+}
+function pedirLocal(forcar) {
+  const O = typeof Ouranos !== 'undefined' ? Ouranos : null;
+  if (!O || typeof O.requestLocation !== 'function') { aEstado = 'indisponivel'; atualizaControleAmanhecer(); render(); return; }
+  const atual = O.location();
+  if (!forcar && atual && atual.src === 'gps' && atual.lat != null) { definirLocal(atual.lat, atual.lon); return; }   /* já obtida (ex.: no Mapa Astral) */
+  if (atual && atual.pending) { aEstado = 'pedindo'; atualizaControleAmanhecer(); render(); return; }
+  aEstado = 'pedindo'; atualizaControleAmanhecer(); render();
+  O.requestLocation(true);
+}
+document.addEventListener('calendarium:localizacao', (e) => { const d = e && e.detail; if (d) definirLocal(d.lat, d.lon); });
+document.addEventListener('calendarium:localizacao-erro', (e) => {
+  const d = (e && e.detail) || {};
+  if (d.negado) limparLocal('negado');                       /* negou: esquece a localização e volta às 06:00 */
+  else if (aLoc) { aEstado = 'ok'; atualizaControleAmanhecer(); render(); }   /* falha passageira: mantém a que já tinha */
+  else { aEstado = 'indisponivel'; atualizaControleAmanhecer(); render(); }
+});
+(function () {
+  const btn = document.getElementById('btnDawnLoc');
+  if (btn) btn.addEventListener('click', () => pedirLocal(true));
+  atualizaControleAmanhecer();
+  /* Sem pedir nada por conta própria: só reaproveita a localização se a permissão JÁ foi concedida antes
+     (assim não aparece um aviso do navegador ao abrir o app). Quem ainda não decidiu usa o botão. */
+  window.addEventListener('load', () => {
+    try {
+      if (!navigator.permissions || typeof navigator.permissions.query !== 'function') return;
+      navigator.permissions.query({ name: 'geolocation' }).then((p) => {
+        if (p.state === 'granted') pedirLocal(false);
+        else if (p.state === 'denied') { aEstado = 'negado'; atualizaControleAmanhecer(); render(); }
+        p.onchange = () => { if (p.state === 'granted') pedirLocal(true); else if (p.state === 'denied') limparLocal('negado'); };
+      }).catch(() => { /* ignora */ });
+    } catch (e) { /* ignora */ }
+  });
+})();
+
+/* ---------- seletor de hemisfério (etapa B) ---------- */
+/* Só local: o esquema do store (festas/diario/diario_log) e as regras da nuvem não têm lugar para preferências,
+   então nada disto vai para a sincronização. localStorage sempre em try/catch (bloqueado = vale só nesta sessão). */
+function atualizaControleHemi() {
+  ['sul', 'norte'].forEach((h) => {
+    const b = document.getElementById(h === 'sul' ? 'btnHemiSul' : 'btnHemiNorte');
+    if (!b) return;
+    b.setAttribute('aria-pressed', hemi === h ? 'true' : 'false');
+    b.className = 'btn' + (hemi === h ? ' btn-on' : '');
+  });
+}
+function definirHemi(h) {
+  if (!ehHemi(h)) return false;
+  if (h === hemi) { atualizaControleHemi(); return true; }
+  hemi = h;
+  try { window.localStorage.setItem(HEMI_KEY, h); } catch (e) { /* sem armazenamento: vale só nesta sessão */ }
+  atualizaControleHemi();
+  render();
+  const myst = document.getElementById('mysteriesView');
+  if (myst && myst.style.display === 'block' && typeof window.mystRender === 'function') window.mystRender();
+  try { document.dispatchEvent(new CustomEvent('calendarium:hemisferio-mudou', { detail: { hemisferio: h } })); } catch (e) { /* ignora */ }
+  return true;
+}
+(function () {
+  const sul = document.getElementById('btnHemiSul'), norte = document.getElementById('btnHemiNorte');
+  if (sul) sul.addEventListener('click', () => definirHemi('sul'));
+  if (norte) norte.addEventListener('click', () => definirHemi('norte'));
+  atualizaControleHemi();
+})();
+
 /* ---------- kit para as etapas 2 e 3 (sem efeito visível agora) ---------- */
 let dialSeq = 0;
 function dialSVG(horas, opts) {
@@ -387,9 +561,10 @@ function dialSVG(horas, opts) {
   const tot = Math.floor(h * 60 + 1e-6) % 1440;
   const raw = opts && opts.id != null ? String(opts.id).replace(/[^\w-]/g, '_') : '';
   const sfx = '-' + (raw || 'dial' + (++dialSeq));            /* IDs únicos: nunca colidem com os do relógio principal */
-  const period = h >= 6 && h < 12 ? 'Amanhecer (🜢)' : h >= 12 && h < 18 ? 'Entardecer (🜬)' : 'Noite (✧)';
+  const dw = opts && typeof opts.dawn === 'number' && opts.dawn >= 0 && opts.dawn < 12 ? opts.dawn : DAWN;   /* amanhecer opcional (padrão 06:00) */
+  const period = h >= dw && h < 12 ? 'Amanhecer (🜢)' : h >= 12 && h < 18 ? 'Entardecer (🜬)' : 'Noite (✧)';
   const [x, y] = polar(96, 180 + h * 15);
-  return `<svg viewBox="375 375 250 250" class="dial" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Mostrador de 24 horas, ${pad(Math.floor(tot / 60))}:${pad(tot % 60)}" focusable="false">${dayCore(110, period, sfx)}${sunTip(x, y, 6)}</svg>`;
+  return `<svg viewBox="375 375 250 250" class="dial" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Mostrador de 24 horas, ${pad(Math.floor(tot / 60))}:${pad(tot % 60)}" focusable="false">${dayCore(110, period, sfx, dw)}${sunTip(x, y, 6)}</svg>`;
 }
 function moonInfo(date) {
   const ms = date instanceof Date ? date.getTime() : Number(date);
@@ -419,5 +594,12 @@ function lunarMonth(x) {
   while (monthStartDay(k) > L) k--;
   return lunarMonthK(k);
 }
-window.LiturgyKit = { dialSVG, moonInfo, civilOfLitDay, WEEK, PHASES, litDay, lunarMonth, lunarMonthK };
+/* amanhecer(data) → { horas, padrao, motivo, estado }: horas = hora local decimal em que começa o dia litúrgico daquela data civil */
+function amanhecer(x) {
+  const ms = x instanceof Date ? x.getTime() : Number(x);
+  if (!isFinite(ms)) return null;
+  const r = amanhecerDoDia(Math.floor((ms - new Date(ms).getTimezoneOffset() * 60000) / DAY_MS));
+  return { horas: r.h, padrao: r.padrao, motivo: r.motivo, estado: aEstado };
+}
+window.LiturgyKit = { dialSVG, moonInfo, civilOfLitDay, WEEK, PHASES, litDay, lunarMonth, lunarMonthK, amanhecer, setLocal: definirLocal, setHemisferio: definirHemi, hemisferio: () => hemi, estacoes: () => seasons().slice(), clearLocal: () => limparLocal('padrao'), DAWN };
 })();

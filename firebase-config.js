@@ -12,3 +12,9 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "802764434497",
   appId: "1:802764434497:web:a2dd7c154c487b55116ac0"
 };
+
+/* App Check (opcional). Cole aqui a chave PÚBLICA (site key) do reCAPTCHA registrada em
+   Firebase → Segurança → App Check. A chave SECRETA nunca vai para o código: fica só no console.
+   Deixe null para não usar App Check. Provedor: 'v3' (gratuito) ou 'enterprise'. */
+window.FIREBASE_APPCHECK_CHAVE = null;
+window.FIREBASE_APPCHECK_PROVEDOR = 'v3';

@@ -2,8 +2,9 @@
    MANSÕES LUNARES
    As 28 mansões da Lua (tradição árabe / Picatrix). Cada mansão ocupa 360°/28 ≈ 12°51′26″
    do zodíaco, contadas a partir de 0° de Áries; a mansão da vez é a que contém a longitude da Lua.
-   Dados e cálculo vêm do app "Mansões Lunares" (mansoes.js), aqui isolados em um módulo próprio:
-   nada vaza para o escopo global além de window.MansoesLunares.
+   Cálculo e interface vêm do app "Mansões Lunares" (mansoes.js), aqui isolados em um módulo próprio; os DADOS
+   das 28 mansões ficam em mansoes-dados.js (window.MansoesDados), que deve ser carregado ANTES deste arquivo.
+   Fora isso, nada vaza para o escopo global além de window.MansoesLunares.
    Usado por duas abas:
      · Lunar        → #lunarMansoes   (lunar.js chama MansoesLunares.setLunar a cada redesenho)
      · Mapa Astral  → #astralMansoes  (ouranos.js chama MansoesLunares.setAstral a cada mapa novo)
@@ -17,37 +18,13 @@
   var SIGNS = ["Áries","Touro","Gêmeos","Câncer","Leão","Virgem","Libra","Escorpião","Sagitário","Capricórnio","Aquário","Peixes"];
   var GLYPHS = ["♈","♉","♊","♋","♌","♍","♎","♏","♐","♑","♒","♓"];
 
-  // [árabe, nome árabe, nome no Picatrix, epíteto, favorece[], desfavorece[], texto, anjo]
-  var M = [
-    ["الشرطين","Al Sharatain","Alnath","Os Dois Sinais",["Negócios"],[],"Os árabes viam aqui forças em conflito, tanto naturais, como redemoinhos, quanto do dia a dia, como discussões.","Geniel"],
-    ["البطين","Al Butani","Albotain","O Ventre",["Comércio","Descoberta de tesouros"],["Viagens por mar"],"Marca o temperamento imprudente de quem se arrisca no que é diferente, sem medir as consequências.","Enediel"],
-    ["الثريا","Al Thuraya","Azoraya","O Enxame",["Ciências","Quem vive ao ar livre","Trabalho"],["Casamento","Viagens por água"],"Perfil trabalhador e prático, inclinado às ciências, à economia e à contabilidade.","Amixiel"],
-    ["الدبران","Al Debaran","Aldebaran","O Olho de Deus",["Trabalho","Manufatura","Pequeno comércio"],["Imóveis","Construção","Minas"],"Paixões irresistíveis sob uma aparência de boa índole. Pode haver discórdia no lar.","Azariel"],
-    ["الهقعة","Al Hakah","Almices","A Mancha Branca",["Vida privada","Estudos","Segunda metade das viagens"],["Empreendimentos coletivos","Obras humanitárias"],"Favorece o estudo e as artes na vida reservada, mais que a exposição pública. Boa para amizades e casamento.","Gabiel"],
-    ["الهنعة","Al Hanach","Athaya","A Cicatriz",["Vida social"],["Trabalho agrícola","Trabalho pesado"],"Indica convalescenças lentas e possíveis perdas financeiras ao longo da vida, mas guarda a boa vontade dos outros.","Dirachiel"],
-    ["الذراع","Al Dhira","Aldirah","A Semente ou o Galho",["Amor","Amizades","Ganhos","Cura"],["Leis e justiça"],"Amor pela casa e pela família e necessidade de amigos por perto. Pessoa amável, que se contenta com pouco.","Scheliel"],
-    ["النثرة","Al Nathrah","Annathra","O Berçário",["Amor e amizade nascidos em viagens"],[],"Forte apego à família e amor pelas crianças, até as dos outros.","Amnediel"],
-    ["الطرف","Al Tarf","Atarf","O Olhar",["Casamento (para homens)","Força de personalidade"],["Casamento e felicidade (para mulheres)"],"As fontes divergem. Uma descreve alguém afável e benevolente; outra, mulheres desanimadas e homens de personalidade forte.","Barbiel"],
-    ["الجبهة","Al Jabbah","Algebha","A Testa",["Estudos","Ganhos","Amor","Profissão","Defesa contra inimigos"],[],"Sensibilidade aos sentimentos alheios e vida social farta. O risco é o excesso de orgulho e de medicamentos ou drogas.","Ardesiel"],
-    ["الزبرة","Al Zubrah","Azobra","A Juba do Leão",["Comércio","Riqueza","Casamento","Viagens"],["Saúde das mulheres"],"A riqueza costuma vir mais pelo esforço de outra pessoa que pelo próprio.","Neciel"],
-    ["الصرفة","Al Sarfah","Acarfa","O Mudador do Tempo",["Colheitas","Envio de mensagens","Empregados"],["Marinheiros"],"Só se avança servindo aos outros. Pode-se chegar ao topo, desde que com dedicação ao serviço.","Abdizuel"],
-    ["العواء","Al Awwa","Alahue","O Latidor",["Viagens"],[],"Exterior rude que esconde um coração bondoso, com bom discernimento.","Jazeriel"],
-    ["السماك","Al Simac","Azimech","O Desarmado",["Marinheiros"],["Viagens por água","Primeiros anos de casamento"],"Pessoa prudente e analítica, interessada em estudos divinatórios. Os atritos do casamento tendem a passar.","Ergediel"],
-    ["الغفر","Al Ghair","Argafra","A Tampa",["Descobrir tramas hostis","Buscar tesouros"],["Família e outras relações","Viagens"],"Considerada desfavorável a quase tudo. Só serve a quem quer descobrir planos hostis ou procurar tesouros.","Ataliel"],
-    ["الزبانا","Al Jubana","Azubene","As Garras",["Criação de gado","Compra e venda de gado","Especulação"],["Negócios","Casamento","Viagens"],"Quem a tem protege-se pela observação e pelo bom julgamento. A reputação pode sofrer com invejosos.","Azeruel"],
-    ["الإكليل","Iktil Al Jabhah","Alichil","A Cúpula da Cabeça",["Casamento","Posição de responsabilidade","Marinheiros"],[],"Permite um bom casamento e um cargo de responsabilidade. Temperamento forte, mas honrado pelos outros.","Adriel"],
-    ["القلب","Al Kalb","Alcalb","O Coração",["Expor inimigos","Tempos de guerra"],["Quase todo o resto","Família"],"Favorável ao conflito. A tradição a associa a riscos para a mãe e a laços familiares.","Egibiel"],
-    ["الشولة","Al Shaulah","Exaula","O Ferrão",["Caça","Ideias pessoais"],["Comércio","Residência fixa"],"Não favorece uma carreira tranquila nem o apego a um só lugar.","Amutiel"],
-    ["النعائم","Al Ras Al Thuban","Nahaym","A Cabeça do Dragão",["Amor","Sucesso pelo próprio mérito","Favor de mulheres","Ligação livre"],["Casamento","Mudança involuntária de residência"],"O parceiro costuma ser útil nos negócios, mas busca autoridade em casa. Mais adequada a uma ligação livre que ao casamento.","Kyriel"],
-    ["البلدة","Al Baldah","Elbelda","A Cidade ou o Distrito",["Cura após doença","Viagens","Ganhos"],[],"Pessoa imprudente, suscetível e volúvel. Acelera a recuperação depois de doenças.","Bethnael"],
-    ["سعد الذابح","Al Sad Al Dhabih","Caadaldeba","O Assassino Afortunado",["Poder pessoal"],["Casamento","Empréstimos de dinheiro"],"Dá desejo de poder pessoal e a capacidade de escapar das consequências dos próprios atos.","Geliel"],
-    ["سعد بلع","Al Sad Al Bulah","Caaddebolach","O Aviador Afortunado",["Médicos","Soldados","Políticos"],["Casamento","Filhos","Contratos"],"Favorece quem lida com saúde, armas e poder. Traz dificuldades conjugais.","Requiel"],
-    ["سعد السعود","Al Sa’d Al Su’d","Caadacohot","O Mais Infeliz dos Infelizes",[],["Administrar país ou cidade","Carreiras de alto cargo"],"A tradição vê uma carreira agitada e, no fim, infeliz. Quanto mais alta a posição, mais difícil.","Abrinael"],
-    ["سعد الأخبية","Al Sad Al Ahbiyah","Caadalhacbia","A Estrela das Masmorras",["Efeito de remédios"],["Negócios com mulheres","Gravidez"],"No Picatrix, retrata alguém humilde, modesto e temente a Deus, com dificuldades na família e sucesso no exterior.","Aziel"],
-    ["الفرغ المقدم","Al Fargh Al Mukdim","Almiquedam","O Orifício Superior do Cântaro",["Casamento","Agricultura","Compra e venda"],["Viagens oceânicas"],"Pode indicar cobiça e desavenças com irmãos.","Tagriel"],
-    ["الفرغ المؤخر","Al Fargh Al Thani","Algarf almuehar","O Orifício Inferior do Cântaro",["Casamento","Cargos de responsabilidade"],["Viagens","Imóveis"],"Traz gosto por cavalos, ar livre e festas, mas azar com dinheiro.","Alheniel"],
-    ["بطن الحوت","Al Batn Al Hut","Arrexhe","O Ventre do Peixe",["Casamento","Negócios"],["Pessoas doentes","Viagens por mar"],"Pode indicar pobreza e saúde frágil. Às vezes ajuda no momento de perigo.","Amnixiel"]
-  ];
+  /* Dados: mansoes-dados.js (window.MansoesDados.MANSOES, 28 linhas; formato no cabeçalho daquele arquivo). */
+  var M = window.MansoesDados && window.MansoesDados.MANSOES;
+  if (!Array.isArray(M) || M.length !== 28) {
+    /* sem os dados não há mansão a mostrar: não define window.MansoesLunares; lunar.js e ouranos.js já tratam a ausência */
+    if (window.console && console.warn) console.warn('MansoesLunares: mansoes-dados.js não carregou; mansões lunares indisponíveis.');
+    return;
+  }
 
   /* ---------- astronomia ---------- */
   function rad(d) { return d * Math.PI / 180; }
@@ -75,6 +52,41 @@
     return norm(L + s);
   }
   function mansionAt(ms) { return Math.floor(moonLon(new Date(ms)) / SEG) % 28; }
+
+  /* ---------- fases: elongação Sol–Lua ----------
+     Mesma Lua da mansão (moonLon acima) e o mesmo Sol do Mapa Astral (OuranosCalc.sunLon, Meeus cap. 25),
+     com a aberração anual do Sol (−0,00569°). Precisa de ouranos-calc.js carregado ANTES deste arquivo;
+     sem ele, elongation() devolve null e quem chama (lunar.js) volta ao ciclo médio. */
+  var ABERR_SOL = 0.00569;
+  var FASES = ['nova', 'cres', 'cheia', 'min'];   /* elongação 0°, 90°, 180°, 270° */
+  function elongation(date) {
+    try {
+      var OC = window.OuranosCalc;
+      if (!OC || typeof OC.sunLon !== 'function' || typeof OC.centuries !== 'function') return null;
+      var e = norm(moonLon(date) - (OC.sunLon(OC.centuries(date)) - ABERR_SOL));
+      return isFinite(e) ? e : null;
+    } catch (err) { return null; }
+  }
+  function quadrante(ms) { var e = elongation(new Date(ms)); return e === null ? null : Math.floor(e / 90) % 4; }
+  /* instantes exatos (ms) das fases principais entre fromMs e toMs: [{k:'nova'|'cres'|'cheia'|'min', ms}] */
+  function phaseInstants(fromMs, toMs) {
+    var out = [];
+    try {
+      var passo = 6 * 3600000, t = fromMs, q = quadrante(t);
+      if (q === null) return out;
+      while (t < toMs) {
+        var n = Math.min(t + passo, toMs), qn = quadrante(n);
+        if (qn === null) return out;
+        if (qn !== q) {
+          var a = t, b = n, k;
+          for (k = 0; k < 26; k++) { var m = (a + b) / 2; if (quadrante(m) === q) a = m; else b = m; }
+          out.push({ k: FASES[qn], ms: Math.round((a + b) / 2) });
+        }
+        t = n; q = qn;
+      }
+    } catch (err) { /* devolve o que já achou */ }
+    return out;
+  }
 
   /* instante (ms) em que a Lua sai da mansão `from`, para frente (dir = 1) ou para trás (dir = -1) */
   function boundary(ms, from, dir) {
@@ -212,6 +224,9 @@
 
   window.MansoesLunares = {
     data: M,
+    moonLon: moonLon,
+    elongation: elongation,
+    phaseInstants: phaseInstants,
     at: at,
     setLunar: setLunar,
     setAstral: setAstral,

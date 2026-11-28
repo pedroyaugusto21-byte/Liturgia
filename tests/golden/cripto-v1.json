@@ -1,0 +1,31 @@
+{
+  "cofre": {
+    "v": 1,
+    "estado": "migrando",
+    "kid": "S1JZYGdudXw",
+    "rev": 1,
+    "kdf": {
+      "alg": "PBKDF2-SHA256",
+      "iter": 100000,
+      "salt": "anF4f4aNlJuiqbC3vsXM0w"
+    },
+    "criadoEm": "2026-01-01T00:00:00.000Z",
+    "senha": {
+      "iv": "iZCXnqWss7rByM_W",
+      "ct": "-qSMZGoQHZ_dQLrWZQV6S94fTgOT1OiPkSMzN3uSYvGFAFKPog6y02l_5nLFIW01"
+    },
+    "recuperacao": {
+      "salt": "x87V3OPq8fj_Bg0UGyIpMA",
+      "iv": "5u30-wIJEBceJSwz",
+      "ct": "xx1Y2k-QYR7XsR9qGDjwagn7PSMKWiGCJrdCunfSoKlGfBnwet503v4CX_0ckKOd"
+    }
+  },
+  "recuperacao": "VCX3-NPOE-ZPJN-TYHH-5327-YAYK-CEMB-6JRN",
+  "doc": {
+    "v": 1,
+    "alg": "A256GCM",
+    "kid": "S1JZYGdudXw",
+    "iv": "BQwTGiEoLzY9REtS",
+    "ct": "Uuc8ibeK6PSghuKcwEmRWFNMklHi9gpQEKaGPktCwPy1-raLuasjJGRGsT3wfN0hgh1qu8qDSRsL93APvymS6jJoBWd0AhIiyHew0E21ailTFX9FTb5B0u_JhXfe3CVp169uKp2uJjx_oWbvFvPJYhMebFhjX8wvgB17K_DsZRBFNbIJ4ytYORJr-V1bfvs8P53RuY_z7_kkOcS_cfsvr13mX6GtWb8BUnlceQ8dPnqc8Gtxk0gpVO0MjzgAU8ysXA"
+  }
+}

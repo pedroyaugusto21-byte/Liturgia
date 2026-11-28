@@ -7,9 +7,16 @@ rules_version = '2';
 // Resumo:
 //  1. Cada pessoa só enxerga a própria pasta:  usuarios/<id-da-pessoa>/...
 //  2. Quem não entrou na conta (anônimo) não lê nem escreve nada.
-//  3. Só existem três coleções: diario, diario_log e festas. Qualquer outro caminho é proibido.
+//  3. Só existem quatro coleções: diario, diario_log, festas e cofre. Qualquer outro caminho é proibido.
 //  4. Cada documento precisa ter o formato esperado (campos, tipos e tamanhos), para que
 //     lixo ou texto gigante não entrem no banco.
+//  5. Criptografia de ponta a ponta OPCIONAL do Diário: com o cofre ligado, 'diario' e 'diario_log'
+//     guardam o conteúdo CIFRADO (formato v1) e estas regras só enxergam o envelope (versão, id da
+//     chave, IV, tamanho). O servidor NÃO consegue ler o texto, então os limites de 10.000 caracteres
+//     e de 12 itens de clima de um dia cifrado passam a valer só no app, depois de decifrar; aqui fica
+//     apenas um teto de tamanho do texto cifrado (90.000 caracteres, com folga sobre o pior caso de 86.180).
+//     As regras aceitam o formato em claro e o cifrado lado a lado (migração gradual); o app recifra
+//     qualquer documento em claro que apareça depois de o cofre ligar.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -23,6 +30,14 @@ service cloud.firestore {
     // todo documento carrega o instante em que foi enviado (usado na sincronização)
     function temCarimbo(d) {
       return d.atualizadoEm is string && d.atualizadoEm.size() <= 40;
+    }
+
+    // ---------- envelope cifrado (formato v1): AES-256-GCM, IV de 12 bytes (16 caracteres em base64url) ----------
+    function cifradoBase(d) {
+      return d.v == 1 && d.alg == 'A256GCM'
+        && d.kid is string && d.kid.size() >= 1 && d.kid.size() <= 16
+        && d.iv is string && d.iv.size() == 16
+        && d.ct is string && d.ct.size() >= 22 && d.ct.size() <= 90000;
     }
 
     // ---------- DIÁRIO: um documento por dia, id no formato AAAA-MM-DD ----------
@@ -40,6 +55,13 @@ service cloud.firestore {
         && (!('criadoEm' in d) || (d.criadoEm is string && d.criadoEm.size() <= 40))
         && (!('salvoEm' in d) || (d.salvoEm is string && d.salvoEm.size() <= 40));
     }
+    // data e salvoEm ficam em claro (id do documento e resolução de conflitos); o resto vai dentro de 'ct'
+    function diarioCifrado(d) {
+      return d.keys().hasOnly(['data', 'v', 'alg', 'kid', 'iv', 'ct', 'salvoEm', 'atualizadoEm'])
+        && d.keys().hasAll(['data', 'v', 'alg', 'kid', 'iv', 'ct', 'salvoEm', 'atualizadoEm'])
+        && cifradoBase(d)
+        && d.salvoEm is string && d.salvoEm.size() > 0 && d.salvoEm.size() <= 40;
+    }
     function diarioLapide(d) {
       return d.keys().hasOnly(['data', 'apagado', 'atualizadoEm']) && d.apagado == true;
     }
@@ -49,7 +71,7 @@ service cloud.firestore {
         && dia.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}')              // o id do documento é a data do dia
         && request.resource.data.data == dia
         && temCarimbo(request.resource.data)
-        && (diarioNormal(request.resource.data) || diarioLapide(request.resource.data));
+        && (diarioNormal(request.resource.data) || diarioCifrado(request.resource.data) || diarioLapide(request.resource.data));
     }
 
     // ---------- LOG DE SALVAMENTOS: um documento por salvamento ----------
@@ -63,6 +85,12 @@ service cloud.firestore {
         && d.horas is number && d.horas >= 0 && d.horas <= 24
         && d.acao in ['criou', 'atualizou'];
     }
+    function logCifrado(d, id) {
+      return d.keys().hasOnly(['nuvemId', 'v', 'alg', 'kid', 'iv', 'ct', 'atualizadoEm'])
+        && d.keys().hasAll(['nuvemId', 'v', 'alg', 'kid', 'iv', 'ct', 'atualizadoEm'])
+        && d.nuvemId == id
+        && cifradoBase(d);
+    }
     function logLapide(d) {
       return d.keys().hasOnly(['apagado', 'atualizadoEm']) && d.apagado == true;
     }
@@ -71,7 +99,7 @@ service cloud.firestore {
       allow create, update: if dono(uid)
         && logId.size() <= 80
         && temCarimbo(request.resource.data)
-        && (logNormal(request.resource.data, logId) || logLapide(request.resource.data));
+        && (logNormal(request.resource.data, logId) || logCifrado(request.resource.data, logId) || logLapide(request.resource.data));
     }
 
     // ---------- FESTAS PESSOAIS ----------
@@ -93,6 +121,41 @@ service cloud.firestore {
         && festaId.matches('[A-Za-z0-9_-]{1,64}')
         && temCarimbo(request.resource.data)
         && (festaNormal(request.resource.data, festaId) || festaLapide(request.resource.data, festaId));
+    }
+
+    // ---------- COFRE: chave mestra embrulhada pela frase (e pela chave de recuperação) ----------
+    // Um único documento: usuarios/<uid>/cofre/principal. Só tem material já embrulhado (AES-GCM):
+    // sem a frase ou a chave de recuperação, nem o Google consegue abrir.
+    function b64(s, n) { return s is string && s.size() == n && s.matches('[A-Za-z0-9_-]+'); }
+    function cofreValido(d) {
+      return d.keys().hasOnly(['v', 'estado', 'kid', 'rev', 'kdf', 'senha', 'recuperacao', 'criadoEm', 'atualizadoEm'])
+        && d.keys().hasAll(['v', 'estado', 'kid', 'rev', 'kdf', 'senha', 'criadoEm', 'atualizadoEm'])
+        && d.v == 1
+        && d.estado in ['migrando', 'ativo']
+        && b64(d.kid, 11)                                              // 8 bytes
+        && d.rev is int && d.rev >= 1
+        && d.kdf is map && d.kdf.keys().hasOnly(['alg', 'iter', 'salt'])
+        && d.kdf.alg == 'PBKDF2-SHA256'
+        && d.kdf.iter is int && d.kdf.iter >= 100000 && d.kdf.iter <= 5000000
+        && b64(d.kdf.salt, 22)                                         // 16 bytes
+        && d.senha is map && d.senha.keys().hasOnly(['iv', 'ct']) && b64(d.senha.iv, 16) && b64(d.senha.ct, 64)
+        && (!('recuperacao' in d) || (d.recuperacao is map && d.recuperacao.keys().hasOnly(['salt', 'iv', 'ct'])
+              && b64(d.recuperacao.salt, 22) && b64(d.recuperacao.iv, 16) && b64(d.recuperacao.ct, 64)))
+        && d.criadoEm is string && d.criadoEm.size() <= 40;
+    }
+    match /usuarios/{uid}/cofre/{docId} {
+      allow read, delete: if dono(uid);
+      allow create: if dono(uid) && docId == 'principal'
+        && temCarimbo(request.resource.data)
+        && cofreValido(request.resource.data)
+        && request.resource.data.rev == 1;
+      // cada mudança soma 1 ao rev (duas trocas simultâneas não se sobrepõem) e a chave mestra (kid) não muda;
+      // para trocar a chave, apaga-se o cofre e cria-se outro
+      allow update: if dono(uid) && docId == 'principal'
+        && temCarimbo(request.resource.data)
+        && cofreValido(request.resource.data)
+        && request.resource.data.rev == resource.data.rev + 1
+        && request.resource.data.kid == resource.data.kid;
     }
 
     // ---------- todo o resto é proibido ----------
