@@ -55,7 +55,9 @@ function computeKeyDays(y, m) {
 
 /* Dimensões do canvas (etapa C): recalculadas no carregamento e a cada resize/giro (ver o fim do arquivo).
    O estado da aba (current, hovered, keyDays) fica fora daqui e não é tocado. */
-let DPR = 1, SIZE = 360, CX = 180, CY = 180, R_OUTER = 0, R_INNER = 0, R_LABEL = 0, R_MOON = 0;
+/* DPR e SIZE começam em 0 de propósito: assim a primeira chamada de dimensiona() sempre calcula os raios (com 360 e DPR 1 ela
+   achava que "nada mudou", deixava os raios em 0 e draw() lançava "radius ... is negative" em telas com zoom 100%). */
+let DPR = 0, SIZE = 0, CX = 180, CY = 180, R_OUTER = 0, R_INNER = 0, R_LABEL = 0, R_MOON = 0;
 const canvas = document.getElementById('moonCanvas');
 const ctx = canvas.getContext('2d');
 function dimensiona() {

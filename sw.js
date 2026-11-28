@@ -3,7 +3,7 @@
    rode o script depois de editar o site: a versão muda sozinha quando qualquer arquivo do cache muda.
    Fluxo de atualização: ver atualizacao.js (aviso "Há uma atualização disponível. Recarregar"). */
 /* @gerado-inicio — não edite à mão; rode: npm run gerar-sw */
-const VERSAO = 'calendarium-73bf49c05f';
+const VERSAO = 'calendarium-66d8f4d2d0';
 const ARQUIVOS = ['./', 'app.js', 'astral-calc.js', 'astral-vista.js', 'astral.css', 'astral.js', 'atualizacao.css', 'atualizacao.js', 'calendarium.css', 'cofre-ui.js', 'conta.js', 'cripto.js', 'favicon-16.png', 'favicon-32.png', 'favicon-48.png', 'favicon.ico', 'festas.js', 'firebase-config.js', 'hinos-orficos.js', 'icone-lira-180.png', 'icone-lira-192.png', 'icone-lira-512.png', 'icone-lira-maskable-512.png', 'importar.js', 'index.html', 'liturgy.js', 'lunar.js', 'manifest.webmanifest', 'mansoes-dados.js', 'mansoes-lunares.js', 'mansoes.css', 'nuvem.js', 'ouranos-calc.js', 'ouranos-data.js', 'ouranos.js', 'redimensionar.js', 'store.js', 'teurgica-dados.js', 'teurgica-relatorio-calc.js', 'teurgica.css', 'teurgica.js', 'versos-aureos.js'];
 /* @gerado-fim */
 
